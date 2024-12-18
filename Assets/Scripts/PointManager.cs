@@ -1,8 +1,8 @@
 using System.Collections;
 using System.Collections.Generic;
-using Unity.VisualScripting;
 using UnityEngine;
 using System.Linq;
+using System.Diagnostics;
 
 public class PointManager : MonoBehaviour
 {
@@ -21,11 +21,11 @@ public class PointManager : MonoBehaviour
         }
         if (Input.GetKeyDown(KeyCode.Space)) // Touche Espace pour Jarvis March
         {
-            JarvisMarch();
+            MeasureExecutionTime(JarvisMarch, "Jarvis March");
         }
         if (Input.GetKeyDown(KeyCode.G)) // Touche G pour Graham Scan
         {
-            GrahamScan();
+            MeasureExecutionTime(GrahamScan, "Graham Scan");
         }
         if (Input.GetKeyDown(KeyCode.T)) // Touche T pour triangulation incrémentale
         {
@@ -35,7 +35,6 @@ public class PointManager : MonoBehaviour
         {
             TriangulationDelaunay();
         }
-
     }
 
     void AddPoint()
@@ -50,9 +49,22 @@ public class PointManager : MonoBehaviour
         points.Add(pointPos);
         GameObject newPoint = Instantiate(pointPrefab, new Vector3(pointPos.x, pointPos.y, 0), Quaternion.identity);
         pointObjects.Add(newPoint);
+
+        // Mettre à jour la triangulation en temps réel
+        if (points.Count >= 3)
+        {
+            TriangulationIncrementale();
+        }
     }
 
-    // Jarvis March
+    void MeasureExecutionTime(System.Action algorithm, string algorithmName)
+    {
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        algorithm();
+        stopwatch.Stop();
+        UnityEngine.Debug.Log($"{algorithmName} executed in {stopwatch.ElapsedMilliseconds} ms.");
+    }
+
     public void JarvisMarch()
     {
         if (points.Count < 3) return;
@@ -79,7 +91,6 @@ public class PointManager : MonoBehaviour
         DrawHull(hull);
     }
 
-    // Graham Scan
     public void GrahamScan()
     {
         if (points.Count < 3) return;
@@ -125,29 +136,15 @@ public class PointManager : MonoBehaviour
         lineRenderer.loop = true;
     }
 
-    /* 
-    Pour tester Jarvis March, décommentez cette ligne dans Update() :
-        JarvisMarch();
-    Et commentez GrahamScan().
-    
-    Pour tester Graham Scan, décommentez cette ligne dans Update() :
-        GrahamScan();
-    Et commentez JarvisMarch().
-    */
-
     void TriangulationIncrementale()
     {
         if (points.Count < 3)
         {
-            Debug.Log("Pas assez de points pour effectuer la triangulation incrémentale.");
+            UnityEngine.Debug.Log("Pas assez de points pour effectuer la triangulation incrémentale.");
             return;
         }
-        Debug.Log("Triangulation incrémentale commencée.");
 
-        if (points.Count < 3) return;
         triangles.Clear();
-
-        // Ajouter un triangle initial (simple pour débuter)
         triangles.Add(new Triangle(points[0], points[1], points[2]));
 
         for (int i = 3; i < points.Count; i++)
@@ -161,7 +158,6 @@ public class PointManager : MonoBehaviour
     {
         List<Triangle> badTriangles = new List<Triangle>();
 
-        // Trouver tous les triangles dont le cercle circonscrit contient le nouveau point
         foreach (Triangle triangle in triangles)
         {
             if (triangle.IsPointInCircumcircle(newPoint))
@@ -170,16 +166,13 @@ public class PointManager : MonoBehaviour
             }
         }
 
-        // Créer de nouvelles arêtes
         List<Edge> polygon = GetPolygonEdges(badTriangles);
 
-        // Retirer les mauvais triangles
         foreach (Triangle badTriangle in badTriangles)
         {
             triangles.Remove(badTriangle);
         }
 
-        // Créer de nouveaux triangles
         foreach (Edge edge in polygon)
         {
             triangles.Add(new Triangle(edge.A, edge.B, newPoint));
@@ -200,10 +193,9 @@ public class PointManager : MonoBehaviour
     {
         if (triangles.Count == 0)
         {
-            Debug.Log("Aucun triangle pour effectuer la triangulation de Delaunay.");
+            UnityEngine.Debug.Log("Aucun triangle pour effectuer la triangulation de Delaunay.");
             return;
         }
-        Debug.Log("Triangulation de Delaunay commencée.");
 
         bool flipped;
         do
@@ -261,13 +253,28 @@ public class PointManager : MonoBehaviour
     {
         foreach (Triangle triangle in triangles)
         {
-            Debug.DrawLine(triangle.A, triangle.B, Color.green, 10f);
-            Debug.DrawLine(triangle.B, triangle.C, Color.green, 10f);
-            Debug.DrawLine(triangle.C, triangle.A, Color.green, 10f);
+            CreateTriangleVisualization(triangle);
         }
     }
+    void CreateTriangleVisualization(Triangle triangle)
+    {
+        GameObject triangleObject = new GameObject("Triangle");
+        LineRenderer lineRenderer = triangleObject.AddComponent<LineRenderer>();
 
+        lineRenderer.positionCount = 4; // 3 sommets + retour au premier point
+        lineRenderer.startWidth = 0.05f;
+        lineRenderer.endWidth = 0.05f;
+        lineRenderer.useWorldSpace = true;
 
+        lineRenderer.SetPosition(0, new Vector3(triangle.A.x, triangle.A.y, 0));
+        lineRenderer.SetPosition(1, new Vector3(triangle.B.x, triangle.B.y, 0));
+        lineRenderer.SetPosition(2, new Vector3(triangle.C.x, triangle.C.y, 0));
+        lineRenderer.SetPosition(3, new Vector3(triangle.A.x, triangle.A.y, 0));
+
+        lineRenderer.material = new Material(Shader.Find("Sprites/Default"));
+        lineRenderer.startColor = Color.green;
+        lineRenderer.endColor = Color.green;
+    }
 }
 
 public class Triangle
@@ -288,7 +295,7 @@ public class Triangle
         float cx = C.x - point.x;
         float cy = C.y - point.y;
 
-        float det = (ax * (by * cy - by * by) - ay * (bx * cy - cx * bx) + (ax * bx - ay * by) * cx);
+        float det = ax * (by * cy - cy * cy) - ay * (bx * cy - cx * bx) + (ax * bx - ay * by) * cx;
         return det > 0;
     }
 
