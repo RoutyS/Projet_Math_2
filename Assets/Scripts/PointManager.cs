@@ -35,6 +35,17 @@ public class PointManager : MonoBehaviour
         {
             TriangulationDelaunay();
         }
+        if (Input.GetKeyDown(KeyCode.A)) // Ajouter un point avec Delaunay
+        {
+            AddPointDelaunay(new Vector2(Random.Range(-5f, 5f), Random.Range(-5f, 5f)));
+        }
+
+        if (Input.GetKeyDown(KeyCode.R)) // Supprimer un point avec Delaunay
+        {
+            if (points.Count > 0) RemovePointDelaunay(points[Random.Range(0, points.Count)]);
+        }
+
+
     }
 
     void AddPoint()
@@ -198,9 +209,13 @@ public class PointManager : MonoBehaviour
         }
 
         bool flipped;
+        int iteration = 0; // Pour éviter une boucle infinie
         do
         {
             flipped = false;
+            iteration++;
+            UnityEngine.Debug.Log($"Delaunay Iteration: {iteration}");
+
             foreach (var triangle in triangles.ToList())
             {
                 foreach (var edge in triangle.GetEdges())
@@ -208,14 +223,23 @@ public class PointManager : MonoBehaviour
                     var adjacentTriangle = FindAdjacentTriangle(triangle, edge);
                     if (adjacentTriangle != null && !IsDelaunay(edge, triangle, adjacentTriangle))
                     {
+                        UnityEngine.Debug.Log($"Flipping edge between {edge.A} and {edge.B}");
                         FlipEdge(edge, triangle, adjacentTriangle);
                         flipped = true;
                     }
                 }
             }
+
+            if (iteration > 100) // Limite pour éviter les boucles infinies
+            {
+                UnityEngine.Debug.LogError("Triangulation Delaunay bloquée dans une boucle infinie.");
+                break;
+            }
         } while (flipped);
+
         DrawTriangles();
     }
+
 
     Triangle FindAdjacentTriangle(Triangle triangle, Edge edge)
     {
@@ -232,8 +256,16 @@ public class PointManager : MonoBehaviour
     bool IsDelaunay(Edge edge, Triangle t1, Triangle t2)
     {
         Vector2 opposite = t2.GetOppositePoint(edge);
-        return !t1.IsPointInCircumcircle(opposite);
+        bool isInCircumcircle = t1.IsPointInCircumcircle(opposite);
+
+        if (isInCircumcircle)
+        {
+            UnityEngine.Debug.Log($"Point {opposite} est dans le cercle circonscrit de {t1.A}, {t1.B}, {t1.C}");
+        }
+
+        return !isInCircumcircle;
     }
+
 
     void FlipEdge(Edge edge, Triangle t1, Triangle t2)
     {
@@ -242,12 +274,17 @@ public class PointManager : MonoBehaviour
         Vector2 c = t1.GetOppositePoint(edge);
         Vector2 d = t2.GetOppositePoint(edge);
 
-        triangles.Remove(t1);
-        triangles.Remove(t2);
+        // Supprimez les triangles existants
+        if (triangles.Contains(t1)) triangles.Remove(t1);
+        if (triangles.Contains(t2)) triangles.Remove(t2);
 
+        // Ajoutez les nouveaux triangles
         triangles.Add(new Triangle(a, c, d));
         triangles.Add(new Triangle(b, c, d));
+
+        UnityEngine.Debug.Log($"Edge flipped: {a}-{b} replaced by {c}-{d}");
     }
+
 
     void DrawTriangles()
     {
@@ -256,6 +293,7 @@ public class PointManager : MonoBehaviour
             CreateTriangleVisualization(triangle);
         }
     }
+
     void CreateTriangleVisualization(Triangle triangle)
     {
         GameObject triangleObject = new GameObject("Triangle");
@@ -275,6 +313,91 @@ public class PointManager : MonoBehaviour
         lineRenderer.startColor = Color.green;
         lineRenderer.endColor = Color.green;
     }
+
+    public void AddPointDelaunay(Vector2 newPoint)
+    {
+        // Ajoutez le nouveau point et ajustez les triangles
+        AddPointToTriangulation(newPoint);
+        TriangulationDelaunay();
+    }
+
+    public void RemovePointDelaunay(Vector2 pointToRemove)
+    {
+        if (!points.Contains(pointToRemove)) return; // Vérifie que le point existe
+        points.Remove(pointToRemove);
+        triangles.Clear();
+        TriangulationIncrementale();
+        TriangulationDelaunay();
+    }
+
+
+    public void GenerateVoronoi()
+    {
+        // Nettoyer les anciennes visualisations
+        foreach (var obj in GameObject.FindGameObjectsWithTag("VoronoiEdge"))
+        {
+            Destroy(obj);
+        }
+
+        // Calculer les points et arêtes de Voronoï
+        List<Vector2> voronoiPoints = new List<Vector2>();
+        foreach (var triangle in triangles)
+        {
+            Vector2 circumcenter = CalculateCircumcenter(triangle.A, triangle.B, triangle.C);
+            voronoiPoints.Add(circumcenter);
+        }
+
+        Rect bounds = new Rect(-5, -5, 10, 10); // Limite les arêtes à une boîte englobante
+        foreach (var triangle in triangles)
+        {
+            Vector2 center1 = CalculateCircumcenter(triangle.A, triangle.B, triangle.C);
+
+            foreach (var edge in triangle.GetEdges())
+            {
+                var adjacentTriangle = FindAdjacentTriangle(triangle, edge);
+                if (adjacentTriangle != null)
+                {
+                    Vector2 center2 = CalculateCircumcenter(adjacentTriangle.A, adjacentTriangle.B, adjacentTriangle.C);
+                    if (bounds.Contains(center1) && bounds.Contains(center2))
+                    {
+                        CreateVoronoiEdge(center1, center2);
+                    }
+                }
+            }
+        }
+    }
+
+    void CreateVoronoiEdge(Vector2 start, Vector2 end)
+    {
+        GameObject voronoiEdge = new GameObject("VoronoiEdge");
+        voronoiEdge.tag = "VoronoiEdge";
+        LineRenderer lineRenderer = voronoiEdge.AddComponent<LineRenderer>();
+
+        lineRenderer.positionCount = 2;
+        lineRenderer.startWidth = 0.05f;
+        lineRenderer.endWidth = 0.05f;
+        lineRenderer.useWorldSpace = true;
+
+        lineRenderer.SetPosition(0, new Vector3(start.x, start.y, 0));
+        lineRenderer.SetPosition(1, new Vector3(end.x, end.y, 0));
+
+        lineRenderer.material = new Material(Shader.Find("Sprites/Default"));
+        lineRenderer.startColor = Color.red;
+        lineRenderer.endColor = Color.red;
+    }
+
+
+
+    Vector2 CalculateCircumcenter(Vector2 a, Vector2 b, Vector2 c)
+    {
+        float D = 2 * (a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y));
+        float Ux = ((a.sqrMagnitude * (b.y - c.y)) + (b.sqrMagnitude * (c.y - a.y)) + (c.sqrMagnitude * (a.y - b.y))) / D;
+        float Uy = ((a.sqrMagnitude * (c.x - b.x)) + (b.sqrMagnitude * (a.x - c.x)) + (c.sqrMagnitude * (b.x - a.x))) / D;
+        return new Vector2(Ux, Uy);
+    }
+
+
+
 }
 
 public class Triangle
