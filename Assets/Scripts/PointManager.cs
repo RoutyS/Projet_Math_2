@@ -8,6 +8,13 @@ public class PointManager : MonoBehaviour
 {
     public GameObject pointPrefab; // Prefab pour représenter un point visuellement
     public LineRenderer lineRenderer; // Pour tracer l'enveloppe convexe
+    private GameObject voronoiParent;
+
+    public Color colorJarvis = Color.blue;
+    public Color colorGraham = Color.green;
+    public Color colorIncremental = Color.cyan;
+    public Color colorDelaunay = Color.yellow;
+    public Color colorVoronoi = Color.red;
 
     private List<Vector2> points = new List<Vector2>();
     private List<GameObject> pointObjects = new List<GameObject>();
@@ -29,22 +36,27 @@ public class PointManager : MonoBehaviour
         }
         if (Input.GetKeyDown(KeyCode.T)) // Touche T pour triangulation incrémentale
         {
-            TriangulationIncrementale();
+            MeasureExecutionTime(TriangulationIncrementale, "Triangulation Incrémentale");
         }
-        if (Input.GetKeyDown(KeyCode.D)) // Touche D pour Delaunay
+        if (Input.GetKeyDown(KeyCode.D)) // Triangulation de Delaunay
         {
-            TriangulationDelaunay();
+            MeasureExecutionTime(TriangulationDelaunay, "Triangulation de Delaunay");
         }
         if (Input.GetKeyDown(KeyCode.A)) // Ajouter un point avec Delaunay
         {
-            AddPointDelaunay(new Vector2(Random.Range(-5f, 5f), Random.Range(-5f, 5f)));
+            MeasureExecutionTime(() => AddPointDelaunay(new Vector2(Random.Range(-5f, 5f), Random.Range(-5f, 5f))), "Ajout de Point pour Delaunay");
         }
-
         if (Input.GetKeyDown(KeyCode.R)) // Supprimer un point avec Delaunay
         {
-            if (points.Count > 0) RemovePointDelaunay(points[Random.Range(0, points.Count)]);
+            if (points.Count > 0)
+            {
+                MeasureExecutionTime(() => RemovePointDelaunay(points[Random.Range(0, points.Count)]), "Suppression de Point pour Delaunay");
+            }
         }
-
+        if (Input.GetKeyDown(KeyCode.V)) // Générer le diagramme de Voronoï
+        {
+            MeasureExecutionTime(GenerateVoronoi, "Génération du Diagramme de Voronoï");
+        }
 
     }
 
@@ -76,43 +88,40 @@ public class PointManager : MonoBehaviour
         UnityEngine.Debug.Log($"{algorithmName} executed in {stopwatch.ElapsedMilliseconds} ms.");
     }
 
+    // Enveloppe convexe avec Jarvis March
     public void JarvisMarch()
     {
         if (points.Count < 3) return;
+
         List<Vector2> hull = new List<Vector2>();
-
-        // Trouver le point le plus à gauche
-        Vector2 leftmost = points[0];
-        foreach (Vector2 p in points)
-            if (p.x < leftmost.x) leftmost = p;
-
+        Vector2 leftmost = points.OrderBy(p => p.x).First();
         Vector2 current = leftmost;
+
         do
         {
             hull.Add(current);
             Vector2 next = points[0];
-            foreach (Vector2 candidate in points)
+            foreach (var candidate in points)
             {
                 if (next == current || IsCounterClockwise(current, next, candidate))
+                {
                     next = candidate;
+                }
             }
             current = next;
         } while (current != leftmost);
 
-        DrawHull(hull);
+        DrawHull(hull, colorJarvis);
     }
 
+    // Enveloppe convexe avec Graham Scan
     public void GrahamScan()
     {
         if (points.Count < 3) return;
 
-        // Étape 1 : Trouver le point le plus bas
         Vector2 pivot = points.OrderBy(p => p.y).ThenBy(p => p.x).First();
+        var sortedPoints = points.OrderBy(p => Mathf.Atan2(p.y - pivot.y, p.x - pivot.x)).ToList();
 
-        // Étape 2 : Trier les points par angle polaire
-        List<Vector2> sortedPoints = points.OrderBy(p => Mathf.Atan2(p.y - pivot.y, p.x - pivot.x)).ToList();
-
-        // Étape 3 : Construire l'enveloppe convexe
         Stack<Vector2> hull = new Stack<Vector2>();
         hull.Push(sortedPoints[0]);
         hull.Push(sortedPoints[1]);
@@ -128,7 +137,7 @@ public class PointManager : MonoBehaviour
             hull.Push(sortedPoints[i]);
         }
 
-        DrawHull(hull.ToList());
+        DrawHull(hull.ToList(), colorGraham);
     }
 
     bool IsCounterClockwise(Vector2 a, Vector2 b, Vector2 c)
@@ -136,24 +145,26 @@ public class PointManager : MonoBehaviour
         return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x) > 0;
     }
 
-    public void DrawHull(List<Vector2> hull)
+    public void DrawHull(List<Vector2> hull, Color lineColor)
     {
         lineRenderer.positionCount = hull.Count + 1;
+        lineRenderer.startWidth = 0.02f;
+        lineRenderer.endWidth = 0.02f;
+        lineRenderer.material = new Material(Shader.Find("Sprites/Default"));
+        lineRenderer.startColor = lineColor;
+        lineRenderer.endColor = lineColor;
+
         for (int i = 0; i < hull.Count; i++)
         {
             lineRenderer.SetPosition(i, new Vector3(hull[i].x, hull[i].y, 0));
         }
-        lineRenderer.SetPosition(hull.Count, new Vector3(hull[0].x, hull[0].y, 0)); // Boucler le polygone
-        lineRenderer.loop = true;
+        lineRenderer.SetPosition(hull.Count, new Vector3(hull[0].x, hull[0].y, 0));
     }
 
+    // Triangulation incrémentale
     void TriangulationIncrementale()
     {
-        if (points.Count < 3)
-        {
-            UnityEngine.Debug.Log("Pas assez de points pour effectuer la triangulation incrémentale.");
-            return;
-        }
+        if (points.Count < 3) return;
 
         triangles.Clear();
         triangles.Add(new Triangle(points[0], points[1], points[2]));
@@ -162,14 +173,13 @@ public class PointManager : MonoBehaviour
         {
             AddPointToTriangulation(points[i]);
         }
-        DrawTriangles();
+        DrawTriangles(colorIncremental);
     }
 
     void AddPointToTriangulation(Vector2 newPoint)
     {
         List<Triangle> badTriangles = new List<Triangle>();
-
-        foreach (Triangle triangle in triangles)
+        foreach (var triangle in triangles)
         {
             if (triangle.IsPointInCircumcircle(newPoint))
             {
@@ -177,14 +187,14 @@ public class PointManager : MonoBehaviour
             }
         }
 
-        List<Edge> polygon = GetPolygonEdges(badTriangles);
+        var polygon = GetPolygonEdges(badTriangles);
 
-        foreach (Triangle badTriangle in badTriangles)
+        foreach (var badTriangle in badTriangles)
         {
             triangles.Remove(badTriangle);
         }
 
-        foreach (Edge edge in polygon)
+        foreach (var edge in polygon)
         {
             triangles.Add(new Triangle(edge.A, edge.B, newPoint));
         }
@@ -193,28 +203,26 @@ public class PointManager : MonoBehaviour
     List<Edge> GetPolygonEdges(List<Triangle> badTriangles)
     {
         List<Edge> edges = new List<Edge>();
-        foreach (Triangle triangle in badTriangles)
+        foreach (var triangle in badTriangles)
         {
             edges.AddRange(triangle.GetEdges());
         }
         return edges;
     }
 
+    // Triangulation de Delaunay
     void TriangulationDelaunay()
     {
-        if (triangles.Count == 0)
-        {
-            UnityEngine.Debug.Log("Aucun triangle pour effectuer la triangulation de Delaunay.");
-            return;
-        }
+        if (triangles.Count == 0) return;
 
         bool flipped;
-        int iteration = 0; // Pour éviter une boucle infinie
+        int iterationLimit = 1000;
+        int iteration = 0;
+
         do
         {
             flipped = false;
             iteration++;
-            UnityEngine.Debug.Log($"Delaunay Iteration: {iteration}");
 
             foreach (var triangle in triangles.ToList())
             {
@@ -223,95 +231,72 @@ public class PointManager : MonoBehaviour
                     var adjacentTriangle = FindAdjacentTriangle(triangle, edge);
                     if (adjacentTriangle != null && !IsDelaunay(edge, triangle, adjacentTriangle))
                     {
-                        UnityEngine.Debug.Log($"Flipping edge between {edge.A} and {edge.B}");
                         FlipEdge(edge, triangle, adjacentTriangle);
                         flipped = true;
                     }
                 }
             }
 
-            if (iteration > 100) // Limite pour éviter les boucles infinies
+            if (iteration > iterationLimit)
             {
-                UnityEngine.Debug.LogError("Triangulation Delaunay bloquée dans une boucle infinie.");
+                UnityEngine.Debug.LogError("Triangulation de Delaunay failed: infinite loop detected.");
                 break;
             }
         } while (flipped);
 
-        DrawTriangles();
+        DrawTriangles(colorDelaunay);
     }
 
 
     Triangle FindAdjacentTriangle(Triangle triangle, Edge edge)
     {
-        foreach (var other in triangles)
-        {
-            if (other != triangle && other.HasEdge(edge))
-            {
-                return other;
-            }
-        }
-        return null;
+        return triangles.FirstOrDefault(t => t != triangle && t.HasEdge(edge));
     }
 
     bool IsDelaunay(Edge edge, Triangle t1, Triangle t2)
     {
-        Vector2 opposite = t2.GetOppositePoint(edge);
-        bool isInCircumcircle = t1.IsPointInCircumcircle(opposite);
-
-        if (isInCircumcircle)
-        {
-            UnityEngine.Debug.Log($"Point {opposite} est dans le cercle circonscrit de {t1.A}, {t1.B}, {t1.C}");
-        }
-
-        return !isInCircumcircle;
+        var opposite = t2.GetOppositePoint(edge);
+        return !t1.IsPointInCircumcircle(opposite);
     }
-
 
     void FlipEdge(Edge edge, Triangle t1, Triangle t2)
     {
-        Vector2 a = edge.A;
-        Vector2 b = edge.B;
-        Vector2 c = t1.GetOppositePoint(edge);
-        Vector2 d = t2.GetOppositePoint(edge);
+        var a = edge.A;
+        var b = edge.B;
+        var c = t1.GetOppositePoint(edge);
+        var d = t2.GetOppositePoint(edge);
 
-        // Supprimez les triangles existants
-        if (triangles.Contains(t1)) triangles.Remove(t1);
-        if (triangles.Contains(t2)) triangles.Remove(t2);
+        triangles.Remove(t1);
+        triangles.Remove(t2);
 
-        // Ajoutez les nouveaux triangles
         triangles.Add(new Triangle(a, c, d));
         triangles.Add(new Triangle(b, c, d));
-
-        UnityEngine.Debug.Log($"Edge flipped: {a}-{b} replaced by {c}-{d}");
     }
 
-
-    void DrawTriangles()
+    void DrawTriangles(Color lineColor)
     {
-        foreach (Triangle triangle in triangles)
+        foreach (var triangle in triangles)
         {
-            CreateTriangleVisualization(triangle);
+            CreateTriangleVisualization(triangle, lineColor);
         }
     }
 
-    void CreateTriangleVisualization(Triangle triangle)
+    void CreateTriangleVisualization(Triangle triangle, Color lineColor)
     {
         GameObject triangleObject = new GameObject("Triangle");
         LineRenderer lineRenderer = triangleObject.AddComponent<LineRenderer>();
 
-        lineRenderer.positionCount = 4; // 3 sommets + retour au premier point
-        lineRenderer.startWidth = 0.05f;
-        lineRenderer.endWidth = 0.05f;
-        lineRenderer.useWorldSpace = true;
+        lineRenderer.positionCount = 4;
+        lineRenderer.startWidth = 0.02f;
+        lineRenderer.endWidth = 0.02f;
+        lineRenderer.material = new Material(Shader.Find("Sprites/Default"));
+        lineRenderer.startColor = lineColor;
+        lineRenderer.endColor = lineColor;
 
         lineRenderer.SetPosition(0, new Vector3(triangle.A.x, triangle.A.y, 0));
         lineRenderer.SetPosition(1, new Vector3(triangle.B.x, triangle.B.y, 0));
         lineRenderer.SetPosition(2, new Vector3(triangle.C.x, triangle.C.y, 0));
         lineRenderer.SetPosition(3, new Vector3(triangle.A.x, triangle.A.y, 0));
-
-        lineRenderer.material = new Material(Shader.Find("Sprites/Default"));
-        lineRenderer.startColor = Color.green;
-        lineRenderer.endColor = Color.green;
     }
 
     public void AddPointDelaunay(Vector2 newPoint)
@@ -331,39 +316,46 @@ public class PointManager : MonoBehaviour
     }
 
 
+    // Diagramme de Voronoï
     public void GenerateVoronoi()
     {
-        // Nettoyer les anciennes visualisations
+        if (!IsTagDefined("VoronoiEdge"))
+        {
+            UnityEngine.Debug.LogError("Tag 'VoronoiEdge' n'est pas défini. Veuillez l'ajouter dans les paramètres Unity.");
+            return;
+        }
+
         foreach (var obj in GameObject.FindGameObjectsWithTag("VoronoiEdge"))
         {
             Destroy(obj);
         }
 
-        // Calculer les points et arêtes de Voronoï
-        List<Vector2> voronoiPoints = new List<Vector2>();
         foreach (var triangle in triangles)
         {
-            Vector2 circumcenter = CalculateCircumcenter(triangle.A, triangle.B, triangle.C);
-            voronoiPoints.Add(circumcenter);
-        }
-
-        Rect bounds = new Rect(-5, -5, 10, 10); // Limite les arêtes à une boîte englobante
-        foreach (var triangle in triangles)
-        {
-            Vector2 center1 = CalculateCircumcenter(triangle.A, triangle.B, triangle.C);
+            var circumcenter1 = CalculateCircumcenter(triangle.A, triangle.B, triangle.C);
 
             foreach (var edge in triangle.GetEdges())
             {
                 var adjacentTriangle = FindAdjacentTriangle(triangle, edge);
                 if (adjacentTriangle != null)
                 {
-                    Vector2 center2 = CalculateCircumcenter(adjacentTriangle.A, adjacentTriangle.B, adjacentTriangle.C);
-                    if (bounds.Contains(center1) && bounds.Contains(center2))
-                    {
-                        CreateVoronoiEdge(center1, center2);
-                    }
+                    var circumcenter2 = CalculateCircumcenter(adjacentTriangle.A, adjacentTriangle.B, adjacentTriangle.C);
+                    CreateVoronoiEdge(circumcenter1, circumcenter2);
                 }
             }
+        }
+    }
+
+    bool IsTagDefined(string tag)
+    {
+        try
+        {
+            GameObject.FindGameObjectsWithTag(tag);
+            return true;
+        }
+        catch
+        {
+            return false;
         }
     }
 
@@ -374,19 +366,15 @@ public class PointManager : MonoBehaviour
         LineRenderer lineRenderer = voronoiEdge.AddComponent<LineRenderer>();
 
         lineRenderer.positionCount = 2;
-        lineRenderer.startWidth = 0.05f;
-        lineRenderer.endWidth = 0.05f;
-        lineRenderer.useWorldSpace = true;
+        lineRenderer.startWidth = 0.02f;
+        lineRenderer.endWidth = 0.02f;
+        lineRenderer.material = new Material(Shader.Find("Sprites/Default"));
+        lineRenderer.startColor = colorVoronoi;
+        lineRenderer.endColor = colorVoronoi;
 
         lineRenderer.SetPosition(0, new Vector3(start.x, start.y, 0));
         lineRenderer.SetPosition(1, new Vector3(end.x, end.y, 0));
-
-        lineRenderer.material = new Material(Shader.Find("Sprites/Default"));
-        lineRenderer.startColor = Color.red;
-        lineRenderer.endColor = Color.red;
     }
-
-
 
     Vector2 CalculateCircumcenter(Vector2 a, Vector2 b, Vector2 c)
     {
@@ -406,7 +394,9 @@ public class Triangle
 
     public Triangle(Vector2 a, Vector2 b, Vector2 c)
     {
-        A = a; B = b; C = c;
+        A = a;
+        B = b;
+        C = c;
     }
 
     public bool IsPointInCircumcircle(Vector2 point)
@@ -418,7 +408,7 @@ public class Triangle
         float cx = C.x - point.x;
         float cy = C.y - point.y;
 
-        float det = ax * (by * cy - cy * cy) - ay * (bx * cy - cx * bx) + (ax * bx - ay * by) * cx;
+        float det = ax * (by * cy - cx * by) - ay * (bx * cy - cx * bx) + (ax * bx - ay * by) * cx;
         return det > 0;
     }
 
