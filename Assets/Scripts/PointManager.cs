@@ -317,17 +317,18 @@ public class PointManager : MonoBehaviour
 
 
     // Diagramme de Voronoï
-    public void GenerateVoronoi()
+   void GenerateVoronoi()
     {
-        if (!IsTagDefined("VoronoiEdge"))
+        if (voronoiParent != null)
         {
-            UnityEngine.Debug.LogError("Tag 'VoronoiEdge' n'est pas défini. Veuillez l'ajouter dans les paramètres Unity.");
-            return;
+            Destroy(voronoiParent);
         }
+        voronoiParent = new GameObject("VoronoiParent");
 
-        foreach (var obj in GameObject.FindGameObjectsWithTag("VoronoiEdge"))
+        if (triangles.Count == 0 || points.Count < 3)
         {
-            Destroy(obj);
+            UnityEngine.Debug.LogError("Impossible de générer un diagramme de Voronoï avec moins de 3 points.");
+            return;
         }
 
         foreach (var triangle in triangles)
@@ -346,23 +347,24 @@ public class PointManager : MonoBehaviour
         }
     }
 
-    bool IsTagDefined(string tag)
+    Vector2 CalculateCircumcenter(Vector2 a, Vector2 b, Vector2 c)
     {
-        try
+        float D = 2 * (a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y));
+        if (Mathf.Abs(D) < Mathf.Epsilon)
         {
-            GameObject.FindGameObjectsWithTag(tag);
-            return true;
+            UnityEngine.Debug.LogError("Les points sont colinéaires, impossible de calculer le centre circonscrit.");
+            return Vector2.zero;
         }
-        catch
-        {
-            return false;
-        }
+
+        float Ux = ((a.sqrMagnitude * (b.y - c.y)) + (b.sqrMagnitude * (c.y - a.y)) + (c.sqrMagnitude * (a.y - b.y))) / D;
+        float Uy = ((a.sqrMagnitude * (c.x - b.x)) + (b.sqrMagnitude * (a.x - c.x)) + (c.sqrMagnitude * (b.x - a.x))) / D;
+        return new Vector2(Ux, Uy);
     }
 
     void CreateVoronoiEdge(Vector2 start, Vector2 end)
     {
         GameObject voronoiEdge = new GameObject("VoronoiEdge");
-        voronoiEdge.tag = "VoronoiEdge";
+        voronoiEdge.transform.parent = voronoiParent.transform;
         LineRenderer lineRenderer = voronoiEdge.AddComponent<LineRenderer>();
 
         lineRenderer.positionCount = 2;
@@ -376,13 +378,7 @@ public class PointManager : MonoBehaviour
         lineRenderer.SetPosition(1, new Vector3(end.x, end.y, 0));
     }
 
-    Vector2 CalculateCircumcenter(Vector2 a, Vector2 b, Vector2 c)
-    {
-        float D = 2 * (a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y));
-        float Ux = ((a.sqrMagnitude * (b.y - c.y)) + (b.sqrMagnitude * (c.y - a.y)) + (c.sqrMagnitude * (a.y - b.y))) / D;
-        float Uy = ((a.sqrMagnitude * (c.x - b.x)) + (b.sqrMagnitude * (a.x - c.x)) + (c.sqrMagnitude * (b.x - a.x))) / D;
-        return new Vector2(Ux, Uy);
-    }
+
 
 
 
