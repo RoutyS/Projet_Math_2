@@ -58,6 +58,11 @@ public class PointManager : MonoBehaviour
             MeasureExecutionTime(GenerateVoronoi, "Génération du Diagramme de Voronoï");
         }
 
+        if (Input.GetKeyDown(KeyCode.R)) // Reset
+        {
+            ClearAll();
+        }
+
     }
 
     void AddPoint()
@@ -78,6 +83,38 @@ public class PointManager : MonoBehaviour
         {
             TriangulationIncrementale();
         }
+    }
+
+    private void ClearVisualization()
+    {
+        // Réinitialiser le LineRenderer
+        if (lineRenderer != null)
+        {
+            lineRenderer.positionCount = 0;
+        }
+
+        // Effacer les triangles
+        triangles.Clear();
+
+        // Effacer les arêtes de Voronoi si elles existent
+        if (voronoiParent != null)
+        {
+            Destroy(voronoiParent);
+        }
+    }
+
+    private void ClearAll()
+    {
+        // Effacer les visualisations
+        ClearVisualization();
+
+        // Effacer tous les points
+        foreach (var point in pointObjects)
+        {
+            Destroy(point);
+        }
+        pointObjects.Clear();
+        points.Clear();
     }
 
     void MeasureExecutionTime(System.Action algorithm, string algorithmName)
@@ -138,6 +175,26 @@ public class PointManager : MonoBehaviour
         }
 
         DrawHull(hull.ToList(), colorGraham);
+    }
+
+    public void CompareAlgorithms()
+    {
+        // Mesurer Jarvis
+        var jarvisTime = new Stopwatch();
+        jarvisTime.Start();
+        JarvisMarch();
+        jarvisTime.Stop();
+
+        // Mesurer Graham
+        var grahamTime = new Stopwatch();
+        grahamTime.Start();
+        GrahamScan();
+        grahamTime.Stop();
+
+        // Afficher la comparaison
+        UnityEngine.Debug.Log($"Jarvis March: {jarvisTime.ElapsedMilliseconds}ms");
+        UnityEngine.Debug.Log($"Graham Scan: {grahamTime.ElapsedMilliseconds}ms");
+        UnityEngine.Debug.Log($"Le plus efficace est : {(jarvisTime.ElapsedMilliseconds < grahamTime.ElapsedMilliseconds ? "Jarvis" : "Graham")}");
     }
 
     bool IsCounterClockwise(Vector2 a, Vector2 b, Vector2 c)
