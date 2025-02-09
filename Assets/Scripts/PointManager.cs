@@ -20,6 +20,10 @@ public class PointManager : MonoBehaviour
     private List<GameObject> pointObjects = new List<GameObject>();
     private List<Triangle> triangles = new List<Triangle>();
 
+    public Material cellMaterial;  // Matériau pour les cellules de Voronoï
+    private Dictionary<Vector2, VoronoiCell> voronoiCells = new Dictionary<Vector2, VoronoiCell>();
+    private GameObject cellsParent;  // Parent pour tous les objets de cellules
+
     void Update()
     {
         if (Input.GetMouseButtonDown(0)) // Clic gauche de la souris
@@ -715,6 +719,145 @@ public class PointManager : MonoBehaviour
         }
     }
 
+    private void UpdateVoronoiDiagram()
+    {
+        CleanupVoronoiEdges();
+        CleanupVoronoiCells();
+
+        if (points.Count < 3) return;
+
+        // Initialiser les cellules pour chaque point
+        voronoiCells.Clear();
+        foreach (var point in points)
+        {
+            voronoiCells[point] = new VoronoiCell(point);
+        }
+
+        Vector2[] boundingBox = GetExtendedBoundingBox(2f);
+        HashSet<VoronoiEdge> processedEdges = new HashSet<VoronoiEdge>();
+
+        // Calculer les sommets des cellules
+        foreach (var triangle in triangles)
+        {
+            var cc1 = CalculateCircumcenterPrecise(triangle.A, triangle.B, triangle.C);
+
+            // Ajouter le centre du cercle circonscrit comme sommet aux cellules des trois points
+            voronoiCells[triangle.A].AddVertex(cc1);
+            voronoiCells[triangle.B].AddVertex(cc1);
+            voronoiCells[triangle.C].AddVertex(cc1);
+
+            foreach (var edge in triangle.GetEdges())
+            {
+                var adjacentTriangle = FindAdjacentTriangle(triangle, edge);
+                if (adjacentTriangle != null)
+                {
+                    var cc2 = CalculateCircumcenterPrecise(
+                        adjacentTriangle.A,
+                        adjacentTriangle.B,
+                        adjacentTriangle.C
+                    );
+
+                    var voronoiEdge = new VoronoiEdge(cc1, cc2);
+                    if (!processedEdges.Contains(voronoiEdge))
+                    {
+                        processedEdges.Add(voronoiEdge);
+                        var (start, end) = ExtendVoronoiEdge(cc1, cc2, boundingBox);
+                        CreateVoronoiEdge(start, end);
+                    }
+                }
+                else
+                {
+                    // Traitement des cellules en bordure
+                    Vector2 perpendicular = new Vector2(-(edge.B.y - edge.A.y), edge.B.x - edge.A.x).normalized;
+                    var boundaryPoint = ExtendRayToBox(cc1, perpendicular, boundingBox);
+                    if (boundaryPoint != Vector2.zero)
+                    {
+                        // Ajouter les points de bordure aux cellules correspondantes
+                        if (edge.A == triangle.A || edge.B == triangle.A)
+                            voronoiCells[triangle.A].AddVertex(boundaryPoint);
+                        if (edge.A == triangle.B || edge.B == triangle.B)
+                            voronoiCells[triangle.B].AddVertex(boundaryPoint);
+                        if (edge.A == triangle.C || edge.B == triangle.C)
+                            voronoiCells[triangle.C].AddVertex(boundaryPoint);
+
+                        CreateVoronoiEdge(cc1, boundaryPoint);
+                    }
+                }
+            }
+        }
+
+        // Créer les cellules visuelles
+        CreateVoronoiCells();
+    }
+
+    private void CleanupVoronoiCells()
+    {
+        if (cellsParent != null)
+        {
+            Destroy(cellsParent);
+        }
+        cellsParent = new GameObject("VoronoiCells");
+    }
+
+    private void CreateVoronoiCells()
+    {
+        foreach (var cell in voronoiCells.Values)
+        {
+            cell.SortVerticesClockwise();
+            CreateCellMesh(cell);
+        }
+    }
+
+    private void CreateCellMesh(VoronoiCell cell)
+    {
+        if (cell.Vertices.Count < 3) return;
+
+        GameObject cellObject = new GameObject($"Cell_{cell.Site}");
+        cellObject.transform.parent = cellsParent.transform;
+
+        MeshFilter meshFilter = cellObject.AddComponent<MeshFilter>();
+        MeshRenderer meshRenderer = cellObject.AddComponent<MeshRenderer>();
+
+        Mesh mesh = new Mesh();
+
+        // Convertir les Vector2 en Vector3 pour le mesh
+        Vector3[] vertices = new Vector3[cell.Vertices.Count];
+        for (int i = 0; i < cell.Vertices.Count; i++)
+        {
+            vertices[i] = new Vector3(cell.Vertices[i].x, cell.Vertices[i].y, 0);
+        }
+
+        // Créer la triangulation du polygone
+        int[] triangles = new int[(cell.Vertices.Count - 2) * 3];
+        for (int i = 0; i < cell.Vertices.Count - 2; i++)
+        {
+            triangles[i * 3] = 0;
+            triangles[i * 3 + 1] = i + 1;
+            triangles[i * 3 + 2] = i + 2;
+        }
+
+        // Assigner les données au mesh
+        mesh.vertices = vertices;
+        mesh.triangles = triangles;
+        mesh.RecalculateNormals();
+
+        meshFilter.mesh = mesh;
+        meshRenderer.material = cellMaterial;
+
+        // Générer une couleur aléatoire semi-transparente pour la cellule
+        Color cellColor = new Color(
+            Random.Range(0.2f, 0.8f),
+            Random.Range(0.2f, 0.8f),
+            Random.Range(0.2f, 0.8f),
+            0.5f
+        );
+        MaterialPropertyBlock propBlock = new MaterialPropertyBlock();
+        propBlock.SetColor("_Color", cellColor);
+        meshRenderer.SetPropertyBlock(propBlock);
+
+        cell.CellObject = cellObject;
+    }
+
     private Vector2[] GetBoundingBox()
     {
         if (points.Count == 0) return new Vector2[4];
@@ -989,5 +1132,38 @@ public struct Edge
     public override int GetHashCode()
     {
         return A.GetHashCode() ^ B.GetHashCode();
+    }
+}
+
+public class VoronoiCell
+{
+    public Vector2 Site { get; private set; }  // Le point générateur de la cellule
+    public List<Vector2> Vertices { get; private set; }  // Les sommets du polygone de la cellule
+    public GameObject CellObject { get; set; }  // L'objet Unity représentant la cellule
+
+    public VoronoiCell(Vector2 site)
+    {
+        Site = site;
+        Vertices = new List<Vector2>();
+    }
+
+    public void AddVertex(Vector2 vertex)
+    {
+        if (!Vertices.Contains(vertex))
+        {
+            Vertices.Add(vertex);
+        }
+    }
+
+    public void SortVerticesClockwise()
+    {
+        // Trier les sommets dans le sens horaire autour du site
+        Vector2 center = Site;
+        Vertices.Sort((a, b) =>
+        {
+            float angleA = Mathf.Atan2(a.y - center.y, a.x - center.x);
+            float angleB = Mathf.Atan2(b.y - center.y, b.x - center.x);
+            return angleA.CompareTo(angleB);
+        });
     }
 }
