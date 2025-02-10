@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using UnityEngine;
 using System.Linq;
 using System.Diagnostics;
+using System;
+
 
 public class PointManager : MonoBehaviour
 {
@@ -19,6 +21,10 @@ public class PointManager : MonoBehaviour
     private List<Vector2> points = new List<Vector2>();
     private List<GameObject> pointObjects = new List<GameObject>();
     private List<Triangle> triangles = new List<Triangle>();
+
+    private GrapheIncidence2D graphe = new GrapheIncidence2D();
+
+
 
     void Update()
     {
@@ -38,29 +44,32 @@ public class PointManager : MonoBehaviour
         {
             MeasureExecutionTime(TriangulationIncrementale, "Triangulation Incrémentale");
         }
-        if (Input.GetKeyDown(KeyCode.D)) // Triangulation de Delaunay
+        /*if (Input.GetKeyDown(KeyCode.D)) // Triangulation de Delaunay
         {
             MeasureExecutionTime(TriangulationDelaunay, "Triangulation de Delaunay");
-        }
-        if (Input.GetKeyDown(KeyCode.A)) // Ajouter un point avec Delaunay
+        }*/
+        /*if (Input.GetKeyDown(KeyCode.A)) // Ajouter un point avec Delaunay
         {
-            MeasureExecutionTime(() => AddPointDelaunay(new Vector2(Random.Range(-5f, 5f), Random.Range(-5f, 5f))), "Ajout de Point pour Delaunay");
-        }
-        if (Input.GetKeyDown(KeyCode.R)) // Supprimer un point avec Delaunay
-        {
-            if (points.Count > 0)
-            {
-                MeasureExecutionTime(() => RemovePointDelaunay(points[Random.Range(0, points.Count)]), "Suppression de Point pour Delaunay");
-            }
-        }
+            MeasureExecutionTime(() => AddPointDelaunay(new Vector2(UnityEngine.Random.Range(-5f, 5f), UnityEngine.Random.Range(-5f, 5f))), "Ajout de Point pour Delaunay");
+        }*/
+        
         if (Input.GetKeyDown(KeyCode.V)) // Générer le diagramme de Voronoï
         {
             MeasureExecutionTime(GenerateVoronoi, "Génération du Diagramme de Voronoï");
         }
 
+        if (Input.GetKeyDown(KeyCode.C))  // ou une autre touche de ton choix
+        {
+            CompareAlgorithms();  // Cela va comparer Jarvis et Graham
+        }
+
         if (Input.GetKeyDown(KeyCode.R)) // Reset
         {
             ClearAll();
+            if (points.Count > 0)
+            {
+                MeasureExecutionTime(() => RemovePointDelaunay(points[UnityEngine.Random.Range(0, points.Count)]), "Suppression de Point pour Delaunay");
+            }
         }
 
     }
@@ -115,6 +124,13 @@ public class PointManager : MonoBehaviour
         }
         pointObjects.Clear();
         points.Clear();
+
+        // Détruire tous les objets Triangle dans la scène
+        GameObject[] triangleObjects = GameObject.FindGameObjectsWithTag("Triangle");
+        foreach (var triangleObj in triangleObjects)
+        {
+            Destroy(triangleObj);
+        }
     }
 
     void MeasureExecutionTime(System.Action algorithm, string algorithmName)
@@ -221,16 +237,33 @@ public class PointManager : MonoBehaviour
     // Triangulation incrémentale
     void TriangulationIncrementale()
     {
-        if (points.Count < 3) return;
-
-        triangles.Clear();
-        triangles.Add(new Triangle(points[0], points[1], points[2]));
-
-        for (int i = 3; i < points.Count; i++)
+        if (points.Count < 3)
         {
-            AddPointToTriangulation(points[i]);
+            UnityEngine.Debug.Log("Pas assez de points pour la triangulation incrémentale.");
+            return;
         }
-        DrawTriangles(colorIncremental);
+
+        try
+        {
+            ClearVisualization();
+            triangles.Clear();
+
+            // Créer le triangle initial
+            triangles.Add(new Triangle(points[0], points[1], points[2]));
+
+            // Ajouter les points suivants un par un
+            for (int i = 3; i < points.Count; i++)
+            {
+                AddPointToTriangulation(points[i]);
+            }
+
+            DrawTriangles(colorIncremental);
+            UnityEngine.Debug.Log($"Triangulation incrémentale terminée avec {triangles.Count} triangles.");
+        }
+        catch (Exception e)
+        {
+            UnityEngine.Debug.LogError($"Erreur lors de la triangulation incrémentale : {e.Message}");
+        }
     }
 
     void AddPointToTriangulation(Vector2 newPoint)
@@ -268,9 +301,59 @@ public class PointManager : MonoBehaviour
     }
 
     // Triangulation de Delaunay
+    /*void TriangulationDelaunay()
+    {
+        if (triangles.Count == 0)
+        {
+            UnityEngine.Debug.Log("Aucun triangle à traiter pour Delaunay.");
+            return;
+        }
+
+        try
+        {
+            bool flipped;
+            int iterationLimit = 1000;
+            int iteration = 0;
+            int flipCount = 0;
+
+            do
+            {
+                flipped = false;
+                iteration++;
+
+                foreach (var triangle in triangles.ToList())
+                {
+                    foreach (var edge in triangle.GetEdges())
+                    {
+                        var adjacentTriangle = FindAdjacentTriangle(triangle, edge);
+                        if (adjacentTriangle != null && !IsDelaunay(edge, triangle, adjacentTriangle))
+                        {
+                            FlipEdge(edge, triangle, adjacentTriangle);
+                            flipped = true;
+                            flipCount++;
+                        }
+                    }
+                }
+
+                if (iteration > iterationLimit)
+                {
+                    UnityEngine.Debug.LogWarning("Triangulation de Delaunay : limite d'itérations atteinte.");
+                    break;
+                }
+            } while (flipped);
+
+            DrawTriangles(colorDelaunay);
+            UnityEngine.Debug.Log($"Triangulation de Delaunay terminée en {iteration} itérations. {flipCount} arêtes flippées.");
+        }
+        catch (Exception e)
+        {
+            UnityEngine.Debug.LogError($"Erreur lors de la triangulation de Delaunay : {e.Message}");
+        }
+    }*/
+
     void TriangulationDelaunay()
     {
-        if (triangles.Count == 0) return;
+        if (triangles.Count < 2) return;
 
         bool flipped;
         int iterationLimit = 1000;
@@ -281,22 +364,28 @@ public class PointManager : MonoBehaviour
             flipped = false;
             iteration++;
 
-            foreach (var triangle in triangles.ToList())
+            var currentTriangles = new List<Triangle>(triangles);
+
+            foreach (var triangle in currentTriangles)
             {
                 foreach (var edge in triangle.GetEdges())
                 {
                     var adjacentTriangle = FindAdjacentTriangle(triangle, edge);
-                    if (adjacentTriangle != null && !IsDelaunay(edge, triangle, adjacentTriangle))
+
+                    if (adjacentTriangle != null)
                     {
-                        FlipEdge(edge, triangle, adjacentTriangle);
-                        flipped = true;
+                        if (!IsDelaunay(edge, triangle, adjacentTriangle))
+                        {
+                            FlipEdge(edge, triangle, adjacentTriangle);
+                            flipped = true;
+                        }
                     }
                 }
             }
 
             if (iteration > iterationLimit)
             {
-                UnityEngine.Debug.LogError("Triangulation de Delaunay failed: infinite loop detected.");
+                UnityEngine.Debug.LogWarning("Triangulation de Delaunay : limite d'itérations atteinte");
                 break;
             }
         } while (flipped);
@@ -334,6 +423,62 @@ public class PointManager : MonoBehaviour
         return adjacentTriangles;
     }
 
+    public void AddPointDelaunay(Vector2 newPoint)
+    {
+        // Trouver le triangle contenant le nouveau point
+        Triangle containingTriangle = FindContainingTriangle(newPoint);
+
+        if (containingTriangle == null)
+        {
+            UnityEngine.Debug.LogWarning("Aucun triangle ne contient le point.");
+            return;
+        }
+
+        // Subdiviser ce triangle en trois
+        List<Triangle> newTriangles = SubdivideTriangle(containingTriangle, newPoint);
+
+        // Appliquer le flipping localement
+        Queue<Edge> edgesToCheck = new Queue<Edge>();
+        foreach (var triangle in newTriangles)
+        {
+            foreach (var edge in triangle.GetEdges())
+            {
+                edgesToCheck.Enqueue(edge);
+            }
+        }
+
+        while (edgesToCheck.Count > 0)
+        {
+            Edge edge = edgesToCheck.Dequeue();
+            var adjacentTriangles = FindAdjacentTrianglesForEdge(edge);
+
+            if (adjacentTriangles.Count == 2 &&
+                !IsDelaunay(edge, adjacentTriangles[0], adjacentTriangles[1]))
+            {
+                FlipEdge(edge, adjacentTriangles[0], adjacentTriangles[1]);
+
+                // Ajouter les nouvelles arêtes à vérifier
+                foreach (var newTriangle in adjacentTriangles)
+                {
+                    foreach (var newEdge in newTriangle.GetEdges())
+                    {
+                        edgesToCheck.Enqueue(newEdge);
+                    }
+                }
+            }
+        }
+    }
+
+    Triangle FindAdjacentTriangle(Triangle triangle, Edge edge)
+    {
+        // Rechercher un triangle différent de 'triangle' qui partage exactement cette arête
+        return triangles.FirstOrDefault(t =>
+            t != triangle &&
+            t.HasEdge(edge)
+        );
+    }
+
+
     private void CleanupVoronoiEdges()
     {
         // Détruire l'ancien parent s'il existe
@@ -345,7 +490,7 @@ public class PointManager : MonoBehaviour
         voronoiParent = new GameObject("VoronoiEdges");
     }
 
-    private void AddBoundingPoints(List<Vector2> points, Vector2[] boundingBox, float margin)
+    /*private void AddBoundingPoints(List<Vector2> points, Vector2[] boundingBox, float margin)
     {
         float minX = boundingBox[0].x - margin;
         float maxX = boundingBox[1].x + margin;
@@ -357,9 +502,9 @@ public class PointManager : MonoBehaviour
         points.Add(new Vector2(maxX, minY));
         points.Add(new Vector2(maxX, maxY));
         points.Add(new Vector2(minX, maxY));
-    }
+    }*/
 
-    private List<Triangle> GenerateDelaunayTriangulation(List<Vector2> points)
+    /*private List<Triangle> GenerateDelaunayTriangulation(List<Vector2> points)
     {
         // Créer une triangulation initiale avec un super-triangle
         List<Triangle> delaunayTriangles = new List<Triangle>();
@@ -425,18 +570,23 @@ public class PointManager : MonoBehaviour
             t.SharesVertex(p1) || t.SharesVertex(p2) || t.SharesVertex(p3));
 
         return delaunayTriangles;
-    }
+    }*/
 
-    Triangle FindAdjacentTriangle(Triangle triangle, Edge edge)
-    {
-        return triangles.FirstOrDefault(t => t != triangle && t.HasEdge(edge));
-    }
-
+    
     bool IsDelaunay(Edge edge, Triangle t1, Triangle t2)
+    {
+        Vector2 oppositeInT1 = t1.GetOppositePoint(edge);
+        Vector2 oppositeInT2 = t2.GetOppositePoint(edge);
+
+        return !t1.IsPointInCircumcircle(oppositeInT2) &&
+               !t2.IsPointInCircumcircle(oppositeInT1);
+    }
+
+    /*bool IsDelaunay(Edge edge, Triangle t1, Triangle t2)
     {
         var opposite = t2.GetOppositePoint(edge);
         return !t1.IsPointInCircumcircle(opposite);
-    }
+    }*/
 
     void FlipEdge(Edge edge, Triangle t1, Triangle t2)
     {
@@ -463,6 +613,7 @@ public class PointManager : MonoBehaviour
     void CreateTriangleVisualization(Triangle triangle, Color lineColor)
     {
         GameObject triangleObject = new GameObject("Triangle");
+        triangleObject.tag = "Triangle";
         LineRenderer lineRenderer = triangleObject.AddComponent<LineRenderer>();
 
         lineRenderer.positionCount = 4;
@@ -478,7 +629,7 @@ public class PointManager : MonoBehaviour
         lineRenderer.SetPosition(3, new Vector3(triangle.A.x, triangle.A.y, 0));
     }
 
-    public void AddPointDelaunay(Vector2 newPoint)
+    /*public void AddPointDelaunay(Vector2 newPoint)
     {
         // Trouver le triangle contenant le nouveau point
         Triangle containingTriangle = FindContainingTriangle(newPoint);
@@ -510,7 +661,7 @@ public class PointManager : MonoBehaviour
                 }
             }
         }
-    }
+    }*/
 
     private Triangle FindContainingTriangle(Vector2 point)
     {
@@ -772,7 +923,7 @@ public class PointManager : MonoBehaviour
         }
     }
 
-    private Vector2[] GetBoundingBox()
+    /*private Vector2[] GetBoundingBox()
     {
         if (points.Count == 0) return new Vector2[4];
 
@@ -792,9 +943,9 @@ public class PointManager : MonoBehaviour
         new Vector2(maxX + margin, maxY + margin),
         new Vector2(minX - margin, maxY + margin)
     };
-    }
+    }*/
 
-    private bool IsEdgeInBounds(Vector2 start, Vector2 end, Vector2[] boundingBox)
+    /*private bool IsEdgeInBounds(Vector2 start, Vector2 end, Vector2[] boundingBox)
     {
         float minX = boundingBox[0].x;
         float maxX = boundingBox[2].x;
@@ -812,7 +963,7 @@ public class PointManager : MonoBehaviour
         }
 
         return startInBounds || endInBounds;
-    }
+    }*/
 
     private bool LineIntersectsBox(Vector2 start, Vector2 end, Vector2[] boundingBox)
     {
@@ -858,7 +1009,7 @@ public class PointManager : MonoBehaviour
         return true;
     }
 
-    private Vector2 CalculateBoundaryPoint(Edge edge, Vector2 circumcenter, Vector2[] boundingBox)
+    /*private Vector2 CalculateBoundaryPoint(Edge edge, Vector2 circumcenter, Vector2[] boundingBox)
     {
         // Calculer le point milieu de l'arête
         Vector2 midPoint = (edge.A + edge.B) * 0.5f;
@@ -870,7 +1021,7 @@ public class PointManager : MonoBehaviour
         float maxDist = Vector2.Distance(boundingBox[0], boundingBox[2]) * 2;
 
         return circumcenter + direction * maxDist;
-    }
+    }*/
 
     private bool IsValidVoronoiEdge(Vector2 start, Vector2 end)
     {
@@ -958,9 +1109,36 @@ public class PointManager : MonoBehaviour
         float Uy = ((a.sqrMagnitude * (c.x - b.x)) + (b.sqrMagnitude * (a.x - c.x)) + (c.sqrMagnitude * (b.x - a.x))) / D;
         return new Vector2(Ux, Uy);
     }
+    
 
 
 
+
+}
+
+
+public class GrapheIncidence2D
+{
+    public Dictionary<Vector2, List<Vector2>> adjacencyList = new Dictionary<Vector2, List<Vector2>>();
+
+    public void AjouterArete(Vector2 sommetA, Vector2 sommetB)
+    {
+        if (!adjacencyList.ContainsKey(sommetA))
+            adjacencyList[sommetA] = new List<Vector2>();
+        if (!adjacencyList.ContainsKey(sommetB))
+            adjacencyList[sommetB] = new List<Vector2>();
+
+        adjacencyList[sommetA].Add(sommetB);
+        adjacencyList[sommetB].Add(sommetA);
+    }
+
+    public void SupprimerArete(Vector2 sommetA, Vector2 sommetB)
+    {
+        if (adjacencyList.ContainsKey(sommetA))
+            adjacencyList[sommetA].Remove(sommetB);
+        if (adjacencyList.ContainsKey(sommetB))
+            adjacencyList[sommetB].Remove(sommetA);
+    }
 }
 
 public class Triangle
