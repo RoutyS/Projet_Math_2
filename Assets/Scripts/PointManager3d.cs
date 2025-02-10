@@ -1,4 +1,4 @@
-using UnityEngine;
+ï»¿using UnityEngine;
 using System.Collections.Generic;
 using System.Linq;
 using System;
@@ -8,7 +8,7 @@ public class PointManager3D : MonoBehaviour
 {
     [Header("Visualization")]
     public GameObject pointPrefab;
-    public LineRenderer lineRenderer;  // Référence au LineRenderer
+    public LineRenderer lineRenderer;  // RÃ©fÃ©rence au LineRenderer
     public float pointSize = 0.2f;
 
     public Color colorJarvis = Color.blue;
@@ -35,7 +35,7 @@ public class PointManager3D : MonoBehaviour
             lineRenderer.startWidth = 0.05f;
             lineRenderer.endWidth = 0.05f;
             lineRenderer.positionCount = 0;
-            // Définir le matériau pour supporter les couleurs
+            // DÃ©finir le matÃ©riau pour supporter les couleurs
             lineRenderer.material.SetColor("_Color", Color.white);
         }
     }
@@ -48,7 +48,7 @@ public class PointManager3D : MonoBehaviour
     void HandleInput()
     {
         // Mode de placement des points
-        if (Input.GetKey(KeyCode.LeftControl)) // Maintenir Ctrl pour un placement précis
+        if (Input.GetKey(KeyCode.LeftControl)) // Maintenir Ctrl pour un placement prÃ©cis
         {
             if (Input.GetMouseButtonDown(0))
             {
@@ -61,8 +61,8 @@ public class PointManager3D : MonoBehaviour
                     Vector3 precisPoint = ray.GetPoint(distance);
                     AddPoint3D(precisPoint);
 
-                    // Afficher des informations de débogage
-                    UnityEngine.Debug.Log($"Point 3D précis ajouté : {precisPoint}");
+                    // Afficher des informations de dÃ©bogage
+                    UnityEngine.Debug.Log($"Point 3D prÃ©cis ajoutÃ© : {precisPoint}");
                 }
             }
         }
@@ -78,14 +78,14 @@ public class PointManager3D : MonoBehaviour
             }
         }
 
-        // Autres touches de contrôle
+        // Autres touches de contrÃ´le
         if (Input.GetKeyDown(KeyCode.Space)) // Jarvis March
         {
             ClearVisualization();
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             JarvisMarch3D();
             stopwatch.Stop();
-            UnityEngine.Debug.Log($"Jarvis March 3D exécuté en {stopwatch.ElapsedMilliseconds}ms");
+            UnityEngine.Debug.Log($"Jarvis March 3D exÃ©cutÃ© en {stopwatch.ElapsedMilliseconds}ms");
         }
 
         if (Input.GetKeyDown(KeyCode.G)) // Graham Scan
@@ -94,7 +94,7 @@ public class PointManager3D : MonoBehaviour
             GrahamScan3D();
         }
 
-        if (Input.GetKeyDown(KeyCode.T)) // Triangulation Incrémentale
+        if (Input.GetKeyDown(KeyCode.T)) // Triangulation IncrÃ©mentale
         {
             ClearVisualization();
             TriangulationIncrementale3D();
@@ -106,7 +106,7 @@ public class PointManager3D : MonoBehaviour
             TriangulationDelaunay3D();
         }
 
-        if (Input.GetKeyDown(KeyCode.V)) // Diagramme de Voronoï
+        if (Input.GetKeyDown(KeyCode.V)) // Diagramme de VoronoÃ¯
         {
             ClearVisualization();
             GenerateVoronoi3D();
@@ -117,15 +117,23 @@ public class PointManager3D : MonoBehaviour
             ClearAll();
         }
 
-        if (Input.GetKeyDown(KeyCode.P)) // Point aléatoire
+        if (Input.GetKeyDown(KeyCode.P)) // Point alÃ©atoire
         {
             AddRandomPoint3D();
         }
 
-        if (Input.GetKeyDown(KeyCode.I)) // Débogage
+        if (Input.GetKeyDown(KeyCode.I)) // DÃ©bogage
         {
             DebugGrapheIncidence3D();
         }
+
+        if (Input.GetKeyDown(KeyCode.O)) // Touche O pour la 3D
+        {
+            UnityEngine.Debug.Log("Correction de l'orientation trigonomÃ©trique des tÃ©traÃ¨dres...");
+            CorrigerOrientationTriangles3D();
+        }
+
+
     }
     /*void HandlePointPlacement()
     {
@@ -149,7 +157,7 @@ public class PointManager3D : MonoBehaviour
     void HandlePointPlacement()
     {
         // Mode placement avec contraintes
-        if (Input.GetKey(KeyCode.LeftControl)) // Maintenir Ctrl pour un placement précis
+        if (Input.GetKey(KeyCode.LeftControl)) // Maintenir Ctrl pour un placement prÃ©cis
         {
             // Placement sur un plan de travail
             if (Input.GetMouseButtonDown(0))
@@ -163,14 +171,14 @@ public class PointManager3D : MonoBehaviour
                     Vector3 precisPoint = ray.GetPoint(distance);
                     AddPoint3D(precisPoint);
 
-                    // Afficher des informations de débogage
-                    UnityEngine.Debug.Log($"Point 3D précis ajouté : {precisPoint}");
+                    // Afficher des informations de dÃ©bogage
+                    UnityEngine.Debug.Log($"Point 3D prÃ©cis ajoutÃ© : {precisPoint}");
                 }
             }
         }
         else
         {
-            // Votre méthode de placement existante
+            // Votre mÃ©thode de placement existante
             if (Input.GetMouseButtonDown(0))
             {
                 Ray ray = mainCamera.ScreenPointToRay(Input.mousePosition);
@@ -191,7 +199,7 @@ public class PointManager3D : MonoBehaviour
         // Configurer la taille et la couleur
         point.transform.localScale = Vector3.one * pointSize;
 
-        // Appliquer un dégradé de couleur basé sur la position
+        // Appliquer un dÃ©gradÃ© de couleur basÃ© sur la position
         Renderer renderer = point.GetComponent<Renderer>();
         if (renderer != null)
         {
@@ -222,7 +230,7 @@ public class PointManager3D : MonoBehaviour
         point.transform.localScale = Vector3.one * pointSize;
         pointObjects.Add(point);
 
-        // Mettre à jour le graphe d'incidence
+        // Mettre Ã  jour le graphe d'incidence
         if (points3D.Count >= 4)
         {
             foreach (var edge in CreateEdgesForPoint(position))
@@ -259,7 +267,7 @@ public class PointManager3D : MonoBehaviour
         // Effacer les visualisations
         ClearVisualization();
 
-        // Détruire tous les points
+        // DÃ©truire tous les points
         foreach (var point in pointObjects)
         {
             Destroy(point);
@@ -289,7 +297,7 @@ public class PointManager3D : MonoBehaviour
         }
     }
 
-    // Ajout de la méthode pour dessiner une liste de lignes
+    // Ajout de la mÃ©thode pour dessiner une liste de lignes
     private void DrawLines(List<Vector3> points, Color color)
     {
         if (lineRenderer == null) return;
@@ -304,7 +312,7 @@ public class PointManager3D : MonoBehaviour
     {
         List<Vector3> lines = new List<Vector3>();
 
-        // Ajouter toutes les arêtes
+        // Ajouter toutes les arÃªtes
         lines.Add(tetra.A);
         lines.Add(tetra.B);
 
@@ -404,7 +412,7 @@ public class PointManager3D : MonoBehaviour
         }
     }
 
-    // Graham Scan adapté en 3D
+    // Graham Scan adaptÃ© en 3D
     void GrahamScan3D()
     {
         if (points3D.Count < 4) return;
@@ -435,7 +443,7 @@ public class PointManager3D : MonoBehaviour
         }
     }
 
-    // Triangulation Incrémentale en 3D
+    // Triangulation IncrÃ©mentale en 3D
     void TriangulationIncrementale3D()
     {
         if (points3D.Count < 4) return;
@@ -478,7 +486,7 @@ public class PointManager3D : MonoBehaviour
         var stopwatch = new Stopwatch();
         stopwatch.Start();
         float size = 1000f;
-        
+
         Vector3[] superTetraPoints = new[]
         {
             new Vector3(-size, -size, -size),
@@ -509,7 +517,7 @@ public class PointManager3D : MonoBehaviour
 
         DrawTetrahedra(tetrahedra, colorDelaunay);
         stopwatch.Stop();
-        UnityEngine.Debug.Log($"Triangulation Delaunay 3D effectuée en {stopwatch.ElapsedMilliseconds}ms");
+        UnityEngine.Debug.Log($"Triangulation Delaunay 3D effectuÃ©e en {stopwatch.ElapsedMilliseconds}ms");
     }
 
     void AddPointToDelaunay(Vector3 point)
@@ -537,7 +545,7 @@ public class PointManager3D : MonoBehaviour
         }
     }
 
-    // Diagramme de Voronoï en 3D
+    // Diagramme de VoronoÃ¯ en 3D
     void GenerateVoronoi3D()
     {
         if (points3D.Count < 4) return;
@@ -570,7 +578,7 @@ public class PointManager3D : MonoBehaviour
         }
     }
 
-    // Méthodes utilitaires
+    // MÃ©thodes utilitaires
     private List<Face3D> GetBoundaryFaces(List<Tetrahedron> tetrahedra)
     {
         Dictionary<Face3D, int> faceCounts = new Dictionary<Face3D, int>();
@@ -602,13 +610,13 @@ public class PointManager3D : MonoBehaviour
         return Vector3.Cross(b - a, c - b).y > 0;
     }
 
-    // Méthodes de dessin
+    // MÃ©thodes de dessin
     private void DrawTetrahedra(List<Tetrahedron> tetras, Color color)
     {
         List<Vector3> lines = new List<Vector3>();
         foreach (var tetra in tetras)
         {
-            // Première face (ABC)
+            // PremiÃ¨re face (ABC)
             lines.Add(tetra.A);
             lines.Add(tetra.B);
             lines.Add(tetra.B);
@@ -634,20 +642,44 @@ public class PointManager3D : MonoBehaviour
         }
     }
 
+    float Orientation3D(Vector3 a, Vector3 b, Vector3 c, Vector3 d)
+    {
+        float det = Matrix4x4.TRS(Vector3.zero, Quaternion.identity, Vector3.one).determinant;
+        return det;
+    }
+
+    void CorrigerOrientationTriangles3D()
+    {
+        for (int i = 0; i < tetrahedra.Count; i++)
+        {
+            Tetrahedron t = tetrahedra[i];
+
+            // Calcul du dÃ©terminant pour vÃ©rifier si la base est orientÃ©e correctement
+            float orientation = Orientation3D(t.A, t.B, t.C, t.D);
+
+            if (orientation < 0) // Mauvais sens â†’ on inverse un sommet
+            {
+                (t.B, t.C) = (t.C, t.B);
+            }
+        }
+
+        UnityEngine.Debug.Log("Orientation des tÃ©traÃ¨dres corrigÃ©e en 3D !");
+    }
+
 
     void DebugGrapheIncidence3D()
     {
-        UnityEngine.Debug.Log("Débogage du Graphe d'Incidence 3D :");
+        UnityEngine.Debug.Log("DÃ©bogage du Graphe d'Incidence 3D :");
         UnityEngine.Debug.Log($"Nombre total de sommets : {points3D.Count}");
-        UnityEngine.Debug.Log($"Nombre de tétraèdres : {tetrahedra.Count}");
+        UnityEngine.Debug.Log($"Nombre de tÃ©traÃ¨dres : {tetrahedra.Count}");
 
-        // Analyse des arêtes
+        // Analyse des arÃªtes
         HashSet<Edge3D> toutesLesAretes = new HashSet<Edge3D>();
         foreach (var tetra in tetrahedra)
         {
             toutesLesAretes.UnionWith(tetra.Aretes);
         }
-        UnityEngine.Debug.Log($"Nombre total d'arêtes : {toutesLesAretes.Count}");
+        UnityEngine.Debug.Log($"Nombre total d'arÃªtes : {toutesLesAretes.Count}");
 
         // Analyse des faces
         HashSet<Face3D> toutesLesFaces = new HashSet<Face3D>();
@@ -705,7 +737,7 @@ public class Tetrahedron
     {
         A = a; B = b; C = c; D = d;
 
-        // Construire les arêtes
+        // Construire les arÃªtes
         Aretes = new List<Edge3D>
         {
             new Edge3D(A, B),
@@ -726,10 +758,10 @@ public class Tetrahedron
         float radius = Vector3.Distance(center, A);
         return Vector3.Distance(center, point) <= radius;
     }
-    
+
     public Vector3 CalculateCircumcenter()
     {
-        // Calculer le centre de la sphère circonscrite
+        // Calculer le centre de la sphÃ¨re circonscrite
         Matrix4x4 m = new Matrix4x4();
         m.SetRow(0, new Vector4(A.x, A.y, A.z, 1));
         m.SetRow(1, new Vector4(B.x, B.y, B.z, 1));

@@ -1,4 +1,4 @@
-using System.Collections;
+ï»¿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using System.Linq;
@@ -8,9 +8,9 @@ using System;
 
 public class PointManager : MonoBehaviour
 {
-    public GameObject pointPrefab; // Prefab pour représenter un point visuellement
+    public GameObject pointPrefab; // Prefab pour reprÃ©senter un point visuellement
     public LineRenderer lineRenderer; // Pour tracer l'enveloppe convexe
-    private GameObject voronoiParent; // Pour contenir toutes les arêtes de Voronoï
+    private GameObject voronoiParent; // Pour contenir toutes les arÃªtes de VoronoÃ¯
 
     public Color colorJarvis = Color.blue;
     public Color colorGraham = Color.green;
@@ -24,6 +24,7 @@ public class PointManager : MonoBehaviour
 
     private GrapheIncidence2D graphe = new GrapheIncidence2D();
 
+    private bool afficherCouleursOrientation = false;
 
 
     void Update()
@@ -40,9 +41,9 @@ public class PointManager : MonoBehaviour
         {
             MeasureExecutionTime(GrahamScan, "Graham Scan");
         }
-        if (Input.GetKeyDown(KeyCode.T)) // Touche T pour triangulation incrémentale
+        if (Input.GetKeyDown(KeyCode.T)) // Touche T pour triangulation incrÃ©mentale
         {
-            MeasureExecutionTime(TriangulationIncrementale, "Triangulation Incrémentale");
+            MeasureExecutionTime(TriangulationIncrementale, "Triangulation IncrÃ©mentale");
         }
         /*if (Input.GetKeyDown(KeyCode.D)) // Triangulation de Delaunay
         {
@@ -52,10 +53,10 @@ public class PointManager : MonoBehaviour
         {
             MeasureExecutionTime(() => AddPointDelaunay(new Vector2(UnityEngine.Random.Range(-5f, 5f), UnityEngine.Random.Range(-5f, 5f))), "Ajout de Point pour Delaunay");
         }*/
-        
-        if (Input.GetKeyDown(KeyCode.V)) // Générer le diagramme de Voronoï
+
+        if (Input.GetKeyDown(KeyCode.V)) // GÃ©nÃ©rer le diagramme de VoronoÃ¯
         {
-            MeasureExecutionTime(GenerateVoronoi, "Génération du Diagramme de Voronoï");
+            MeasureExecutionTime(GenerateVoronoi, "GÃ©nÃ©ration du Diagramme de VoronoÃ¯");
         }
 
         if (Input.GetKeyDown(KeyCode.C))  // ou une autre touche de ton choix
@@ -77,22 +78,40 @@ public class PointManager : MonoBehaviour
             }
         }
 
+        if (Input.GetKeyDown(KeyCode.O)) // Appuyer sur O pour activer/dÃ©sactiver l'affichage des couleurs
+        {
+            afficherCouleursOrientation = !afficherCouleursOrientation;
+            UnityEngine.Debug.Log("Affichage des couleurs d'orientation : " + (afficherCouleursOrientation ? "ActivÃ©" : "DÃ©sactivÃ©"));
+
+            if (afficherCouleursOrientation)
+            {
+                ColorerTriangles(); // Appliquer la couleur
+            }
+            else
+            {
+                ReinitialiserCouleurTriangles(); // RÃ©initialiser les couleurs normales
+            }
+        }
+
+
+        MettreAJourCouleurPoints();
+
     }
 
     void AddPoint()
     {
-        // Convertir la position de la souris en coordonnées du monde
+        // Convertir la position de la souris en coordonnÃ©es du monde
         Vector3 mousePos = Input.mousePosition;
         mousePos.z = Mathf.Abs(Camera.main.transform.position.z);
         Vector3 worldPos = Camera.main.ScreenToWorldPoint(mousePos);
         Vector2 pointPos = new Vector2(worldPos.x, worldPos.y);
 
-        // Ajouter le point à la liste
+        // Ajouter le point Ã  la liste
         points.Add(pointPos);
         GameObject newPoint = Instantiate(pointPrefab, new Vector3(pointPos.x, pointPos.y, 0), Quaternion.identity);
         pointObjects.Add(newPoint);
 
-        // Mettre à jour la triangulation en temps réel
+        // Mettre Ã  jour la triangulation en temps rÃ©el
         if (points.Count >= 3)
         {
             TriangulationIncrementale();
@@ -101,7 +120,7 @@ public class PointManager : MonoBehaviour
 
     private void ClearVisualization()
     {
-        // Réinitialiser le LineRenderer
+        // RÃ©initialiser le LineRenderer
         if (lineRenderer != null)
         {
             lineRenderer.positionCount = 0;
@@ -110,7 +129,7 @@ public class PointManager : MonoBehaviour
         // Effacer les triangles
         triangles.Clear();
 
-        // Effacer les arêtes de Voronoi si elles existent
+        // Effacer les arÃªtes de Voronoi si elles existent
         if (voronoiParent != null)
         {
             Destroy(voronoiParent);
@@ -130,7 +149,7 @@ public class PointManager : MonoBehaviour
         pointObjects.Clear();
         points.Clear();
 
-        // Détruire tous les objets Triangle dans la scène
+        // DÃ©truire tous les objets Triangle dans la scÃ¨ne
         GameObject[] triangleObjects = GameObject.FindGameObjectsWithTag("Triangle");
         foreach (var triangleObj in triangleObjects)
         {
@@ -239,12 +258,12 @@ public class PointManager : MonoBehaviour
         lineRenderer.SetPosition(hull.Count, new Vector3(hull[0].x, hull[0].y, 0));
     }
 
-    // Triangulation incrémentale
+    // Triangulation incrÃ©mentale
     /*void TriangulationIncrementale()
     {
         if (points.Count < 3)
         {
-            UnityEngine.Debug.Log("Pas assez de points pour la triangulation incrémentale.");
+            UnityEngine.Debug.Log("Pas assez de points pour la triangulation incrÃ©mentale.");
             return;
         }
 
@@ -253,7 +272,7 @@ public class PointManager : MonoBehaviour
             ClearVisualization();
             triangles.Clear();
 
-            // Créer le triangle initial
+            // CrÃ©er le triangle initial
             triangles.Add(new Triangle(points[0], points[1], points[2]));
 
             // Ajouter les points suivants un par un
@@ -263,11 +282,11 @@ public class PointManager : MonoBehaviour
             }
 
             DrawTriangles(colorIncremental);
-            UnityEngine.Debug.Log($"Triangulation incrémentale terminée avec {triangles.Count} triangles.");
+            UnityEngine.Debug.Log($"Triangulation incrÃ©mentale terminÃ©e avec {triangles.Count} triangles.");
         }
         catch (Exception e)
         {
-            UnityEngine.Debug.LogError($"Erreur lors de la triangulation incrémentale : {e.Message}");
+            UnityEngine.Debug.LogError($"Erreur lors de la triangulation incrÃ©mentale : {e.Message}");
         }
     }*/
 
@@ -275,7 +294,7 @@ public class PointManager : MonoBehaviour
     {
         if (points.Count < 3)
         {
-            UnityEngine.Debug.Log("Pas assez de points pour la triangulation incrémentale.");
+            UnityEngine.Debug.Log("Pas assez de points pour la triangulation incrÃ©mentale.");
             return;
         }
 
@@ -283,14 +302,14 @@ public class PointManager : MonoBehaviour
         {
             ClearVisualization();
             triangles.Clear();
-            graphe = new GrapheIncidence2D(); // Réinitialiser le graphe d'incidence
+            graphe = new GrapheIncidence2D(); // RÃ©initialiser le graphe d'incidence
 
-            // Créer le triangle initial dans le sens trigonométrique
+            // CrÃ©er le triangle initial dans le sens trigonomÃ©trique
             Vector2 a = points[0];
             Vector2 b = points[1];
             Vector2 c = points[2];
 
-            // Garantir l'orientation trigonométrique
+            // Garantir l'orientation trigonomÃ©trique
             if (!IsCounterClockwise(a, b, c))
             {
                 // Inverser l'ordre si besoin
@@ -302,7 +321,7 @@ public class PointManager : MonoBehaviour
             Triangle initialTriangle = new Triangle(a, b, c);
             triangles.Add(initialTriangle);
 
-            // Ajouter l'arête initiale au graphe d'incidence
+            // Ajouter l'arÃªte initiale au graphe d'incidence
             graphe.AjouterArete(a, b, initialTriangle);
             graphe.AjouterArete(b, c, initialTriangle);
             graphe.AjouterArete(c, a, initialTriangle);
@@ -314,11 +333,11 @@ public class PointManager : MonoBehaviour
             }
 
             DrawTriangles(colorIncremental);
-            UnityEngine.Debug.Log($"Triangulation incrémentale terminée avec {triangles.Count} triangles.");
+            UnityEngine.Debug.Log($"Triangulation incrÃ©mentale terminÃ©e avec {triangles.Count} triangles.");
         }
         catch (Exception e)
         {
-            UnityEngine.Debug.LogError($"Erreur lors de la triangulation incrémentale : {e.Message}");
+            UnityEngine.Debug.LogError($"Erreur lors de la triangulation incrÃ©mentale : {e.Message}");
         }
     }
 
@@ -366,7 +385,7 @@ public class PointManager : MonoBehaviour
         {
             foreach (var edge in badTriangle.GetEdges())
             {
-                // Ne conserver que les arêtes qui n'apparaissent qu'une seule fois
+                // Ne conserver que les arÃªtes qui n'apparaissent qu'une seule fois
                 bool isShared = badTriangles.Count(t => t.HasEdge(edge)) > 1;
                 if (!isShared)
                 {
@@ -375,23 +394,23 @@ public class PointManager : MonoBehaviour
             }
         }
 
-        // Supprimer les triangles problématiques
+        // Supprimer les triangles problÃ©matiques
         foreach (var badTriangle in badTriangles)
         {
             triangles.Remove(badTriangle);
         }
 
-        // Créer de nouveaux triangles
+        // CrÃ©er de nouveaux triangles
         foreach (var edge in boundaryEdges)
         {
-            // Créer un triangle en s'assurant de l'orientation trigonométrique
+            // CrÃ©er un triangle en s'assurant de l'orientation trigonomÃ©trique
             Triangle newTriangle = IsCounterClockwise(edge.A, edge.B, newPoint)
                 ? new Triangle(edge.A, edge.B, newPoint)
                 : new Triangle(edge.B, edge.A, newPoint);
 
             triangles.Add(newTriangle);
 
-            // Mettre à jour le graphe d'incidence
+            // Mettre Ã  jour le graphe d'incidence
             graphe.AjouterArete(edge.A, edge.B, newTriangle);
             graphe.AjouterArete(edge.B, newPoint, newTriangle);
             graphe.AjouterArete(newPoint, edge.A, newTriangle);
@@ -413,7 +432,7 @@ public class PointManager : MonoBehaviour
     {
         if (triangles.Count == 0)
         {
-            UnityEngine.Debug.Log("Aucun triangle à traiter pour Delaunay.");
+            UnityEngine.Debug.Log("Aucun triangle Ã  traiter pour Delaunay.");
             return;
         }
 
@@ -445,13 +464,13 @@ public class PointManager : MonoBehaviour
 
                 if (iteration > iterationLimit)
                 {
-                    UnityEngine.Debug.LogWarning("Triangulation de Delaunay : limite d'itérations atteinte.");
+                    UnityEngine.Debug.LogWarning("Triangulation de Delaunay : limite d'itÃ©rations atteinte.");
                     break;
                 }
             } while (flipped);
 
             DrawTriangles(colorDelaunay);
-            UnityEngine.Debug.Log($"Triangulation de Delaunay terminée en {iteration} itérations. {flipCount} arêtes flippées.");
+            UnityEngine.Debug.Log($"Triangulation de Delaunay terminÃ©e en {iteration} itÃ©rations. {flipCount} arÃªtes flippÃ©es.");
         }
         catch (Exception e)
         {
@@ -493,7 +512,7 @@ public class PointManager : MonoBehaviour
 
             if (iteration > iterationLimit)
             {
-                UnityEngine.Debug.LogWarning("Triangulation de Delaunay : limite d'itérations atteinte");
+                UnityEngine.Debug.LogWarning("Triangulation de Delaunay : limite d'itÃ©rations atteinte");
                 break;
             }
         } while (flipped);
@@ -504,7 +523,7 @@ public class PointManager : MonoBehaviour
     private List<Triangle> SubdivideTriangle(Triangle triangle, Vector2 point)
     {
         List<Triangle> newTriangles = new List<Triangle>();
-        // Créer trois nouveaux triangles en connectant le point avec chaque sommet
+        // CrÃ©er trois nouveaux triangles en connectant le point avec chaque sommet
         newTriangles.Add(new Triangle(triangle.A, triangle.B, point));
         newTriangles.Add(new Triangle(triangle.B, triangle.C, point));
         newTriangles.Add(new Triangle(triangle.C, triangle.A, point));
@@ -526,7 +545,7 @@ public class PointManager : MonoBehaviour
             {
                 adjacentTriangles.Add(triangle);
             }
-            if (adjacentTriangles.Count == 2) break; // On a trouvé les deux triangles
+            if (adjacentTriangles.Count == 2) break; // On a trouvÃ© les deux triangles
         }
         return adjacentTriangles;
     }
@@ -565,7 +584,7 @@ public class PointManager : MonoBehaviour
             {
                 FlipEdge(edge, adjacentTriangles[0], adjacentTriangles[1]);
 
-                // Ajouter les nouvelles arêtes à vérifier
+                // Ajouter les nouvelles arÃªtes Ã  vÃ©rifier
                 foreach (var newTriangle in adjacentTriangles)
                 {
                     foreach (var newEdge in newTriangle.GetEdges())
@@ -579,7 +598,7 @@ public class PointManager : MonoBehaviour
 
     Triangle FindAdjacentTriangle(Triangle triangle, Edge edge)
     {
-        // Rechercher un triangle différent de 'triangle' qui partage exactement cette arête
+        // Rechercher un triangle diffÃ©rent de 'triangle' qui partage exactement cette arÃªte
         return triangles.FirstOrDefault(t =>
             t != triangle &&
             t.HasEdge(edge)
@@ -589,12 +608,12 @@ public class PointManager : MonoBehaviour
 
     private void CleanupVoronoiEdges()
     {
-        // Détruire l'ancien parent s'il existe
+        // DÃ©truire l'ancien parent s'il existe
         if (voronoiParent != null)
         {
             Destroy(voronoiParent);
         }
-        // Créer un nouveau parent
+        // CrÃ©er un nouveau parent
         voronoiParent = new GameObject("VoronoiEdges");
     }
 
@@ -605,7 +624,7 @@ public class PointManager : MonoBehaviour
         float minY = boundingBox[0].y - margin;
         float maxY = boundingBox[2].y + margin;
 
-        // Ajouter des points aux coins du rectangle englobant élargi
+        // Ajouter des points aux coins du rectangle englobant Ã©largi
         points.Add(new Vector2(minX, minY));
         points.Add(new Vector2(maxX, minY));
         points.Add(new Vector2(maxX, maxY));
@@ -614,7 +633,7 @@ public class PointManager : MonoBehaviour
 
     /*private List<Triangle> GenerateDelaunayTriangulation(List<Vector2> points)
     {
-        // Créer une triangulation initiale avec un super-triangle
+        // CrÃ©er une triangulation initiale avec un super-triangle
         List<Triangle> delaunayTriangles = new List<Triangle>();
 
         // Calculer les dimensions du super-triangle
@@ -680,7 +699,7 @@ public class PointManager : MonoBehaviour
         return delaunayTriangles;
     }*/
 
-    
+
     bool IsDelaunay(Edge edge, Triangle t1, Triangle t2)
     {
         Vector2 oppositeInT1 = t1.GetOppositePoint(edge);
@@ -724,6 +743,26 @@ public class PointManager : MonoBehaviour
         triangleObject.tag = "Triangle";
         LineRenderer lineRenderer = triangleObject.AddComponent<LineRenderer>();
 
+        MeshFilter meshFilter = triangleObject.AddComponent<MeshFilter>();
+        MeshRenderer meshRenderer = triangleObject.AddComponent<MeshRenderer>();
+
+        Mesh mesh = new Mesh();
+        mesh.vertices = new Vector3[]
+        {
+        new Vector3(triangle.A.x, triangle.A.y, 0),
+        new Vector3(triangle.B.x, triangle.B.y, 0),
+        new Vector3(triangle.C.x, triangle.C.y, 0)
+        };
+
+        mesh.triangles = new int[] { 0, 1, 2 };
+        mesh.RecalculateNormals();
+
+        meshFilter.mesh = mesh;
+
+        // MatÃ©riau temporaire
+        meshRenderer.material = new Material(Shader.Find("Standard"));
+        meshRenderer.material.color = lineColor;
+
         lineRenderer.positionCount = 4;
         lineRenderer.startWidth = 0.02f;
         lineRenderer.endWidth = 0.02f;
@@ -762,7 +801,7 @@ public class PointManager : MonoBehaviour
             if (adjacentTriangles.Count == 2 && !IsDelaunay(edge, adjacentTriangles[0], adjacentTriangles[1]))
             {
                 FlipEdge(edge, adjacentTriangles[0], adjacentTriangles[1]);
-                // Ajouter les nouvelles arêtes à vérifier
+                // Ajouter les nouvelles arÃªtes Ã  vÃ©rifier
                 foreach (var newEdge in adjacentTriangles[0].GetEdges().Concat(adjacentTriangles[1].GetEdges()))
                 {
                     edgesToCheck.Enqueue(newEdge);
@@ -795,7 +834,7 @@ public class PointManager : MonoBehaviour
 
     public void RemovePointDelaunay(Vector2 pointToRemove)
     {
-        if (!points.Contains(pointToRemove)) return; // Vérifie que le point existe
+        if (!points.Contains(pointToRemove)) return; // VÃ©rifie que le point existe
         points.Remove(pointToRemove);
         triangles.Clear();
         TriangulationIncrementale();
@@ -803,16 +842,16 @@ public class PointManager : MonoBehaviour
     }
 
 
-    // Diagramme de Voronoï
+    // Diagramme de VoronoÃ¯
     public void GenerateVoronoi()
     {
         CleanupVoronoiEdges();
         if (triangles.Count == 0) return;
 
-        // Calculer la boîte englobante avec une marge plus grande
+        // Calculer la boÃ®te englobante avec une marge plus grande
         Vector2[] boundingBox = GetExtendedBoundingBox(2f); // Facteur d'extension de 2x
 
-        // Stocker les arêtes de Voronoï déjà traitées pour éviter les doublons
+        // Stocker les arÃªtes de VoronoÃ¯ dÃ©jÃ  traitÃ©es pour Ã©viter les doublons
         HashSet<VoronoiEdge> processedEdges = new HashSet<VoronoiEdge>();
 
         // Pour chaque triangle de Delaunay
@@ -836,9 +875,9 @@ public class PointManager : MonoBehaviour
                     {
                         processedEdges.Add(voronoiEdge);
 
-                        // Prolonger l'arête jusqu'aux limites si nécessaire
+                        // Prolonger l'arÃªte jusqu'aux limites si nÃ©cessaire
                         var (start, end) = ExtendVoronoiEdge(cc1, cc2, boundingBox);
-                        if (start != Vector2.zero || end != Vector2.zero) // Vérifier si l'extension est valide
+                        if (start != Vector2.zero || end != Vector2.zero) // VÃ©rifier si l'extension est valide
                         {
                             CreateVoronoiEdge(start, end);
                         }
@@ -846,11 +885,11 @@ public class PointManager : MonoBehaviour
                 }
                 else
                 {
-                    // Pour les arêtes sur l'enveloppe convexe
+                    // Pour les arÃªtes sur l'enveloppe convexe
                     Vector2 edgeMidpoint = (edge.A + edge.B) * 0.5f;
                     Vector2 perpendicular = new Vector2(-(edge.B.y - edge.A.y), edge.B.x - edge.A.x).normalized;
 
-                    // Prolonger dans la direction perpendiculaire à l'arête
+                    // Prolonger dans la direction perpendiculaire Ã  l'arÃªte
                     var boundaryPoint = ExtendRayToBox(cc1, perpendicular, boundingBox);
                     if (boundaryPoint != Vector2.zero)
                     {
@@ -889,12 +928,12 @@ public class PointManager : MonoBehaviour
 
     private Vector2 CalculateCircumcenterPrecise(Vector2 a, Vector2 b, Vector2 c)
     {
-        // Utiliser des doubles pour plus de précision
+        // Utiliser des doubles pour plus de prÃ©cision
         double d = 2.0 * ((a.x * (b.y - c.y)) + (b.x * (c.y - a.y)) + (c.x * (a.y - b.y)));
 
         if (Mathf.Abs((float)d) < 1e-10)
         {
-            // Gérer le cas dégénéré
+            // GÃ©rer le cas dÃ©gÃ©nÃ©rÃ©
             return (a + b + c) / 3f;
         }
 
@@ -1060,11 +1099,11 @@ public class PointManager : MonoBehaviour
         float minY = boundingBox[0].y;
         float maxY = boundingBox[2].y;
 
-        // Vérifier si au moins une partie de l'arête est dans les limites
+        // VÃ©rifier si au moins une partie de l'arÃªte est dans les limites
         bool startInBounds = start.x >= minX && start.x <= maxX && start.y >= minY && start.y <= maxY;
         bool endInBounds = end.x >= minX && end.x <= maxX && end.y >= minY && end.y <= maxY;
 
-        // Si les deux points sont hors limites, vérifier si l'arête traverse la boîte
+        // Si les deux points sont hors limites, vÃ©rifier si l'arÃªte traverse la boÃ®te
         if (!startInBounds && !endInBounds)
         {
             return LineIntersectsBox(start, end, boundingBox);
@@ -1075,7 +1114,7 @@ public class PointManager : MonoBehaviour
 
     private bool LineIntersectsBox(Vector2 start, Vector2 end, Vector2[] boundingBox)
     {
-        // Vérifier l'intersection avec chaque côté de la boîte
+        // VÃ©rifier l'intersection avec chaque cÃ´tÃ© de la boÃ®te
         for (int i = 0; i < 4; i++)
         {
             Vector2 boxStart = boundingBox[i];
@@ -1095,7 +1134,7 @@ public class PointManager : MonoBehaviour
         Vector2 d = b2 - b1;
         float bDotDPerp = b.x * d.y - b.y * d.x;
 
-        // Si les lignes sont parallèles
+        // Si les lignes sont parallÃ¨les
         if (bDotDPerp == 0)
         {
             return false;
@@ -1119,13 +1158,13 @@ public class PointManager : MonoBehaviour
 
     /*private Vector2 CalculateBoundaryPoint(Edge edge, Vector2 circumcenter, Vector2[] boundingBox)
     {
-        // Calculer le point milieu de l'arête
+        // Calculer le point milieu de l'arÃªte
         Vector2 midPoint = (edge.A + edge.B) * 0.5f;
 
         // Vecteur direction depuis le circumcentre vers le point milieu
         Vector2 direction = (midPoint - circumcenter).normalized;
 
-        // Distance max pour être sûr d'atteindre la limite de la boîte
+        // Distance max pour Ãªtre sÃ»r d'atteindre la limite de la boÃ®te
         float maxDist = Vector2.Distance(boundingBox[0], boundingBox[2]) * 2;
 
         return circumcenter + direction * maxDist;
@@ -1133,11 +1172,11 @@ public class PointManager : MonoBehaviour
 
     private bool IsValidVoronoiEdge(Vector2 start, Vector2 end)
     {
-        // Vérifier si l'arête n'est pas dégénérée
+        // VÃ©rifier si l'arÃªte n'est pas dÃ©gÃ©nÃ©rÃ©e
         if (Vector2.Distance(start, end) < 0.0001f)
             return false;
 
-        // Vérifier si les points ne sont pas trop éloignés
+        // VÃ©rifier si les points ne sont pas trop Ã©loignÃ©s
         float maxDistance = 1000f; // Ajustez selon vos besoins
         if (Vector2.Distance(start, end) > maxDistance)
             return false;
@@ -1152,13 +1191,13 @@ public class PointManager : MonoBehaviour
         float minY = boundingBox[0].y;
         float maxY = boundingBox[2].y;
 
-        // Calculer les intersections possibles avec les bords de la boîte
+        // Calculer les intersections possibles avec les bords de la boÃ®te
         float tMinX = (minX - start.x) / direction.x;
         float tMaxX = (maxX - start.x) / direction.x;
         float tMinY = (minY - start.y) / direction.y;
         float tMaxY = (maxY - start.y) / direction.y;
 
-        // Gérer le cas où direction.x ou direction.y est proche de zéro
+        // GÃ©rer le cas oÃ¹ direction.x ou direction.y est proche de zÃ©ro
         if (Mathf.Abs(direction.x) < 1e-10)
         {
             tMinX = float.NegativeInfinity;
@@ -1180,14 +1219,14 @@ public class PointManager : MonoBehaviour
             Mathf.Max(tMinY, tMaxY)
         );
 
-        // Si tMax est négatif, le rayon va dans la mauvaise direction
-        // Si tMin > tMax, le rayon rate la boîte
+        // Si tMax est nÃ©gatif, le rayon va dans la mauvaise direction
+        // Si tMin > tMax, le rayon rate la boÃ®te
         if (tMax < 0 || tMin > tMax)
         {
             return Vector2.zero;
         }
 
-        // Utiliser tMax pour obtenir le point le plus éloigné qui est encore dans la boîte
+        // Utiliser tMax pour obtenir le point le plus Ã©loignÃ© qui est encore dans la boÃ®te
         return start + direction * tMax;
     }
 
@@ -1223,9 +1262,118 @@ public class PointManager : MonoBehaviour
     {
         foreach (var sommet in graphe.adjacencySommetsAretes.Keys)
         {
-            UnityEngine.Debug.Log($"Sommet {sommet} connecté à {graphe.adjacencySommetsAretes[sommet].Count} arêtes");
+            UnityEngine.Debug.Log($"Sommet {sommet} connectÃ© Ã  {graphe.adjacencySommetsAretes[sommet].Count} arÃªtes");
             UnityEngine.Debug.Log($"Triangles adjacents : {graphe.GetTrianglesAdjacents(sommet).Count}");
         }
+    }
+
+    void CorrigerOrientationTriangles()
+    {
+        for (int i = 0; i < triangles.Count; i++)
+        {
+            Triangle triangle = triangles[i];
+
+            if (!IsCounterClockwise(triangle.A, triangle.B, triangle.C))
+            {
+                // Inversion pour respecter le sens trigonomÃ©trique
+                (triangle.B, triangle.C) = (triangle.C, triangle.B);
+            }
+        }
+
+        UnityEngine.Debug.Log("Orientation des triangles corrigÃ©e en 2D !");
+    }
+
+    void MettreAJourCouleurPoints()
+    {
+        foreach (GameObject point in pointObjects)
+        {
+            Vector2 pos = point.transform.position;
+
+            // VÃ©rifier si l'objet a un MeshRenderer
+            MeshRenderer renderer = point.GetComponent<MeshRenderer>();
+
+            if (renderer != null)
+            {
+                // Changer la couleur en fonction de la position Y
+                renderer.material.color = (pos.y >= 0) ? Color.green : Color.red;
+            }
+            else
+            {
+                UnityEngine.Debug.LogWarning($"L'objet {point.name} n'a pas de MeshRenderer !");
+            }
+        }
+    }
+
+    void ColorerTriangles()
+    {
+        if (!afficherCouleursOrientation) return; // Ne rien faire si l'affichage est dÃ©sactivÃ©
+
+        foreach (var triangle in triangles)
+        {
+            bool isCorrect = IsCounterClockwise(triangle.A, triangle.B, triangle.C);
+            GameObject triangleObj = FindTriangleObject(triangle);
+
+            if (triangleObj != null)
+            {
+                LineRenderer lineRenderer = triangleObj.GetComponent<LineRenderer>();
+
+                if (lineRenderer != null)
+                {
+                    // Vert si le triangle est correctement orientÃ©, Rouge sinon
+                    lineRenderer.startColor = isCorrect ? Color.green : Color.red;
+                    lineRenderer.endColor = isCorrect ? Color.green : Color.red;
+                }
+            }
+        }
+    }
+
+
+    void ReinitialiserCouleurTriangles()
+    {
+        foreach (var triangle in triangles)
+        {
+            GameObject triangleObj = FindTriangleObject(triangle);
+
+            if (triangleObj != null)
+            {
+                LineRenderer lineRenderer = triangleObj.GetComponent<LineRenderer>();
+
+                if (lineRenderer != null)
+                {
+                    // Remettre la couleur d'origine (blanc par dÃ©faut)
+                    lineRenderer.startColor = Color.white;
+                    lineRenderer.endColor = Color.white;
+                }
+            }
+        }
+    }
+
+
+    GameObject FindTriangleObject(Triangle triangle)
+    {
+        GameObject[] triangleObjects = GameObject.FindGameObjectsWithTag("Triangle");
+
+        foreach (GameObject obj in triangleObjects)
+        {
+            LineRenderer lineRenderer = obj.GetComponent<LineRenderer>();
+
+            if (lineRenderer != null && lineRenderer.positionCount >= 3)
+            {
+                Vector3 v0 = lineRenderer.GetPosition(0);
+                Vector3 v1 = lineRenderer.GetPosition(1);
+                Vector3 v2 = lineRenderer.GetPosition(2);
+
+                // VÃ©rifier si les positions correspondent au triangle donnÃ© (approximation)
+                if (Vector2.Distance((Vector2)v0, triangle.A) < 0.01f &&
+                    Vector2.Distance((Vector2)v1, triangle.B) < 0.01f &&
+                    Vector2.Distance((Vector2)v2, triangle.C) < 0.01f)
+                {
+                    return obj;
+                }
+            }
+        }
+
+        return null;
     }
 
 
@@ -1234,10 +1382,10 @@ public class PointManager : MonoBehaviour
 
 public class GrapheIncidence2D
 {
-    // Dictionnaire des sommets vers leurs arêtes adjacentes
+    // Dictionnaire des sommets vers leurs arÃªtes adjacentes
     public Dictionary<Vector2, HashSet<Edge>> adjacencySommetsAretes = new Dictionary<Vector2, HashSet<Edge>>();
 
-    // Dictionnaire des arêtes vers les triangles qu'elles forment
+    // Dictionnaire des arÃªtes vers les triangles qu'elles forment
     public Dictionary<Edge, HashSet<Triangle>> adjacencyAretesTriangles = new Dictionary<Edge, HashSet<Triangle>>();
 
     public void AjouterArete(Vector2 sommetA, Vector2 sommetB, Triangle triangle)
@@ -1250,23 +1398,23 @@ public class GrapheIncidence2D
         if (!adjacencySommetsAretes.ContainsKey(sommetB))
             adjacencySommetsAretes[sommetB] = new HashSet<Edge>();
 
-        // Ajouter l'arête aux sommets
+        // Ajouter l'arÃªte aux sommets
         adjacencySommetsAretes[sommetA].Add(nouvelleArete);
         adjacencySommetsAretes[sommetB].Add(nouvelleArete);
 
-        // Ajouter le triangle à l'arête
+        // Ajouter le triangle Ã  l'arÃªte
         if (!adjacencyAretesTriangles.ContainsKey(nouvelleArete))
             adjacencyAretesTriangles[nouvelleArete] = new HashSet<Triangle>();
         adjacencyAretesTriangles[nouvelleArete].Add(triangle);
     }
 
-    // Méthode pour vérifier si un point est connecté à d'autres points
+    // MÃ©thode pour vÃ©rifier si un point est connectÃ© Ã  d'autres points
     public bool EstConnecte(Vector2 point)
     {
         return adjacencySommetsAretes.ContainsKey(point) && adjacencySommetsAretes[point].Count > 0;
     }
 
-    // Méthode pour obtenir les triangles adjacents à un point
+    // MÃ©thode pour obtenir les triangles adjacents Ã  un point
     public HashSet<Triangle> GetTrianglesAdjacents(Vector2 point)
     {
         HashSet<Triangle> trianglesAdjacents = new HashSet<Triangle>();
