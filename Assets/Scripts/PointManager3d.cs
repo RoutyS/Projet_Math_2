@@ -47,17 +47,38 @@ public class PointManager3D : MonoBehaviour
 
     void HandleInput()
     {
-        HandlePointPlacement();
-
-        if (Input.GetMouseButtonDown(0))
+        // Mode de placement des points
+        if (Input.GetKey(KeyCode.LeftControl)) // Maintenir Ctrl pour un placement précis
         {
-            Ray ray = mainCamera.ScreenPointToRay(Input.mousePosition);
-            float distance = 10f;
-            Vector3 pointPos = ray.GetPoint(distance);
-            AddPoint3D(pointPos);
+            if (Input.GetMouseButtonDown(0))
+            {
+                Ray ray = mainCamera.ScreenPointToRay(Input.mousePosition);
+                Plane horizontalPlane = new Plane(Vector3.up, Vector3.zero);
+
+                // Utiliser cette version de Raycast
+                if (horizontalPlane.Raycast(ray, out float distance))
+                {
+                    Vector3 precisPoint = ray.GetPoint(distance);
+                    AddPoint3D(precisPoint);
+
+                    // Afficher des informations de débogage
+                    UnityEngine.Debug.Log($"Point 3D précis ajouté : {precisPoint}");
+                }
+            }
+        }
+        else
+        {
+            // Mode placement standard
+            if (Input.GetMouseButtonDown(0))
+            {
+                Ray ray = mainCamera.ScreenPointToRay(Input.mousePosition);
+                float distance = 10f;
+                Vector3 pointPos = ray.GetPoint(distance);
+                AddPoint3D(pointPos);
+            }
         }
 
-
+        // Autres touches de contrôle
         if (Input.GetKeyDown(KeyCode.Space)) // Jarvis March
         {
             ClearVisualization();
@@ -66,37 +87,47 @@ public class PointManager3D : MonoBehaviour
             stopwatch.Stop();
             UnityEngine.Debug.Log($"Jarvis March 3D exécuté en {stopwatch.ElapsedMilliseconds}ms");
         }
-        /*if (Input.GetKeyDown(KeyCode.Space)) // Jarvis March
-        {
-            ClearVisualization();
-            JarvisMarch3D();
-        }*/
+
         if (Input.GetKeyDown(KeyCode.G)) // Graham Scan
         {
             ClearVisualization();
             GrahamScan3D();
         }
+
         if (Input.GetKeyDown(KeyCode.T)) // Triangulation Incrémentale
         {
             ClearVisualization();
             TriangulationIncrementale3D();
         }
+
         if (Input.GetKeyDown(KeyCode.D)) // Triangulation de Delaunay
         {
             ClearVisualization();
             TriangulationDelaunay3D();
         }
+
         if (Input.GetKeyDown(KeyCode.V)) // Diagramme de Voronoï
         {
             ClearVisualization();
             GenerateVoronoi3D();
         }
+
         if (Input.GetKeyDown(KeyCode.R)) // Reset
         {
             ClearAll();
         }
+
+        if (Input.GetKeyDown(KeyCode.P)) // Point aléatoire
+        {
+            AddRandomPoint3D();
+        }
+
+        if (Input.GetKeyDown(KeyCode.I)) // Débogage
+        {
+            DebugGrapheIncidence3D();
+        }
     }
-    void HandlePointPlacement()
+    /*void HandlePointPlacement()
     {
         if (Input.GetMouseButtonDown(0))  // Premier clic
         {
@@ -113,11 +144,81 @@ public class PointManager3D : MonoBehaviour
             AddPoint3D(newPoint);
             dragStartPosition = null;
         }
+    }*/
+
+    void HandlePointPlacement()
+    {
+        // Mode placement avec contraintes
+        if (Input.GetKey(KeyCode.LeftControl)) // Maintenir Ctrl pour un placement précis
+        {
+            // Placement sur un plan de travail
+            if (Input.GetMouseButtonDown(0))
+            {
+                Ray ray = mainCamera.ScreenPointToRay(Input.mousePosition);
+                Plane horizontalPlane = new Plane(Vector3.up, Vector3.zero);
+
+                // Utiliser cette version de Raycast
+                if (horizontalPlane.Raycast(ray, out float distance))
+                {
+                    Vector3 precisPoint = ray.GetPoint(distance);
+                    AddPoint3D(precisPoint);
+
+                    // Afficher des informations de débogage
+                    UnityEngine.Debug.Log($"Point 3D précis ajouté : {precisPoint}");
+                }
+            }
+        }
+        else
+        {
+            // Votre méthode de placement existante
+            if (Input.GetMouseButtonDown(0))
+            {
+                Ray ray = mainCamera.ScreenPointToRay(Input.mousePosition);
+                float distance = 10f;
+                Vector3 pointPos = ray.GetPoint(distance);
+                AddPoint3D(pointPos);
+            }
+        }
     }
+
+    [Header("Point Configuration")]
+    public float minPointSize = 0.1f;
+    public float maxPointSize = 0.5f;
+    public Color pointColorGradient = Color.white;
+
+    void ConfigurePointVisualization(GameObject point)
+    {
+        // Configurer la taille et la couleur
+        point.transform.localScale = Vector3.one * pointSize;
+
+        // Appliquer un dégradé de couleur basé sur la position
+        Renderer renderer = point.GetComponent<Renderer>();
+        if (renderer != null)
+        {
+            float heightFactor = Mathf.InverseLerp(0, 10, point.transform.position.y);
+            renderer.material.color = Color.Lerp(Color.blue, Color.red, heightFactor);
+        }
+    }
+
+    void AddRandomPoint3D()
+    {
+        Vector3 randomPoint = new Vector3(
+            UnityEngine.Random.Range(-10f, 10f),
+            UnityEngine.Random.Range(0f, 10f),
+            UnityEngine.Random.Range(-10f, 10f)
+        );
+        AddPoint3D(randomPoint);
+    }
+
     void AddPoint3D(Vector3 position)
     {
         points3D.Add(position);
         GameObject point = Instantiate(pointPrefab, position, Quaternion.identity);
+
+        ConfigurePointVisualization(point);
+
+        pointObjects.Add(point);
+
         point.transform.localScale = Vector3.one * pointSize;
         pointObjects.Add(point);
 
@@ -531,6 +632,30 @@ public class PointManager3D : MonoBehaviour
             lineRenderer.positionCount = lines.Count;
             lineRenderer.SetPositions(lines.ToArray());
         }
+    }
+
+
+    void DebugGrapheIncidence3D()
+    {
+        UnityEngine.Debug.Log("Débogage du Graphe d'Incidence 3D :");
+        UnityEngine.Debug.Log($"Nombre total de sommets : {points3D.Count}");
+        UnityEngine.Debug.Log($"Nombre de tétraèdres : {tetrahedra.Count}");
+
+        // Analyse des arêtes
+        HashSet<Edge3D> toutesLesAretes = new HashSet<Edge3D>();
+        foreach (var tetra in tetrahedra)
+        {
+            toutesLesAretes.UnionWith(tetra.Aretes);
+        }
+        UnityEngine.Debug.Log($"Nombre total d'arêtes : {toutesLesAretes.Count}");
+
+        // Analyse des faces
+        HashSet<Face3D> toutesLesFaces = new HashSet<Face3D>();
+        foreach (var tetra in tetrahedra)
+        {
+            toutesLesFaces.UnionWith(tetra.Faces);
+        }
+        UnityEngine.Debug.Log($"Nombre total de faces : {toutesLesFaces.Count}");
     }
 }
 

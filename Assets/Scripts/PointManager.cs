@@ -63,6 +63,11 @@ public class PointManager : MonoBehaviour
             CompareAlgorithms();  // Cela va comparer Jarvis et Graham
         }
 
+        if (Input.GetKeyDown(KeyCode.I)) // Touche I pour Information/Incidence
+        {
+            DebugGrapheIncidence();
+        }
+
         if (Input.GetKeyDown(KeyCode.R)) // Reset
         {
             ClearAll();
@@ -235,7 +240,7 @@ public class PointManager : MonoBehaviour
     }
 
     // Triangulation incrémentale
-    void TriangulationIncrementale()
+    /*void TriangulationIncrementale()
     {
         if (points.Count < 3)
         {
@@ -264,9 +269,60 @@ public class PointManager : MonoBehaviour
         {
             UnityEngine.Debug.LogError($"Erreur lors de la triangulation incrémentale : {e.Message}");
         }
+    }*/
+
+    void TriangulationIncrementale()
+    {
+        if (points.Count < 3)
+        {
+            UnityEngine.Debug.Log("Pas assez de points pour la triangulation incrémentale.");
+            return;
+        }
+
+        try
+        {
+            ClearVisualization();
+            triangles.Clear();
+            graphe = new GrapheIncidence2D(); // Réinitialiser le graphe d'incidence
+
+            // Créer le triangle initial dans le sens trigonométrique
+            Vector2 a = points[0];
+            Vector2 b = points[1];
+            Vector2 c = points[2];
+
+            // Garantir l'orientation trigonométrique
+            if (!IsCounterClockwise(a, b, c))
+            {
+                // Inverser l'ordre si besoin
+                var temp = b;
+                b = c;
+                c = temp;
+            }
+
+            Triangle initialTriangle = new Triangle(a, b, c);
+            triangles.Add(initialTriangle);
+
+            // Ajouter l'arête initiale au graphe d'incidence
+            graphe.AjouterArete(a, b, initialTriangle);
+            graphe.AjouterArete(b, c, initialTriangle);
+            graphe.AjouterArete(c, a, initialTriangle);
+
+            // Ajouter les points suivants un par un
+            for (int i = 3; i < points.Count; i++)
+            {
+                AddPointToTriangulation(points[i]);
+            }
+
+            DrawTriangles(colorIncremental);
+            UnityEngine.Debug.Log($"Triangulation incrémentale terminée avec {triangles.Count} triangles.");
+        }
+        catch (Exception e)
+        {
+            UnityEngine.Debug.LogError($"Erreur lors de la triangulation incrémentale : {e.Message}");
+        }
     }
 
-    void AddPointToTriangulation(Vector2 newPoint)
+    /*void AddPointToTriangulation(Vector2 newPoint)
     {
         List<Triangle> badTriangles = new List<Triangle>();
         foreach (var triangle in triangles)
@@ -287,6 +343,58 @@ public class PointManager : MonoBehaviour
         foreach (var edge in polygon)
         {
             triangles.Add(new Triangle(edge.A, edge.B, newPoint));
+        }
+    }*/
+
+    void AddPointToTriangulation(Vector2 newPoint)
+    {
+        List<Triangle> badTriangles = new List<Triangle>();
+        List<Edge> polygonEdges = new List<Edge>();
+
+        // Optimisation : Rechercher d'abord les triangles contenant le point
+        foreach (var triangle in triangles)
+        {
+            if (triangle.IsPointInCircumcircle(newPoint))
+            {
+                badTriangles.Add(triangle);
+            }
+        }
+
+        // Identifier les bords du polygone de trou
+        HashSet<Edge> boundaryEdges = new HashSet<Edge>();
+        foreach (var badTriangle in badTriangles)
+        {
+            foreach (var edge in badTriangle.GetEdges())
+            {
+                // Ne conserver que les arêtes qui n'apparaissent qu'une seule fois
+                bool isShared = badTriangles.Count(t => t.HasEdge(edge)) > 1;
+                if (!isShared)
+                {
+                    boundaryEdges.Add(edge);
+                }
+            }
+        }
+
+        // Supprimer les triangles problématiques
+        foreach (var badTriangle in badTriangles)
+        {
+            triangles.Remove(badTriangle);
+        }
+
+        // Créer de nouveaux triangles
+        foreach (var edge in boundaryEdges)
+        {
+            // Créer un triangle en s'assurant de l'orientation trigonométrique
+            Triangle newTriangle = IsCounterClockwise(edge.A, edge.B, newPoint)
+                ? new Triangle(edge.A, edge.B, newPoint)
+                : new Triangle(edge.B, edge.A, newPoint);
+
+            triangles.Add(newTriangle);
+
+            // Mettre à jour le graphe d'incidence
+            graphe.AjouterArete(edge.A, edge.B, newTriangle);
+            graphe.AjouterArete(edge.B, newPoint, newTriangle);
+            graphe.AjouterArete(newPoint, edge.A, newTriangle);
         }
     }
 
@@ -1109,9 +1217,16 @@ public class PointManager : MonoBehaviour
         float Uy = ((a.sqrMagnitude * (c.x - b.x)) + (b.sqrMagnitude * (a.x - c.x)) + (c.sqrMagnitude * (b.x - a.x))) / D;
         return new Vector2(Ux, Uy);
     }
-    
 
 
+    void DebugGrapheIncidence()
+    {
+        foreach (var sommet in graphe.adjacencySommetsAretes.Keys)
+        {
+            UnityEngine.Debug.Log($"Sommet {sommet} connecté à {graphe.adjacencySommetsAretes[sommet].Count} arêtes");
+            UnityEngine.Debug.Log($"Triangles adjacents : {graphe.GetTrianglesAdjacents(sommet).Count}");
+        }
+    }
 
 
 }
@@ -1119,25 +1234,53 @@ public class PointManager : MonoBehaviour
 
 public class GrapheIncidence2D
 {
-    public Dictionary<Vector2, List<Vector2>> adjacencyList = new Dictionary<Vector2, List<Vector2>>();
+    // Dictionnaire des sommets vers leurs arêtes adjacentes
+    public Dictionary<Vector2, HashSet<Edge>> adjacencySommetsAretes = new Dictionary<Vector2, HashSet<Edge>>();
 
-    public void AjouterArete(Vector2 sommetA, Vector2 sommetB)
+    // Dictionnaire des arêtes vers les triangles qu'elles forment
+    public Dictionary<Edge, HashSet<Triangle>> adjacencyAretesTriangles = new Dictionary<Edge, HashSet<Triangle>>();
+
+    public void AjouterArete(Vector2 sommetA, Vector2 sommetB, Triangle triangle)
     {
-        if (!adjacencyList.ContainsKey(sommetA))
-            adjacencyList[sommetA] = new List<Vector2>();
-        if (!adjacencyList.ContainsKey(sommetB))
-            adjacencyList[sommetB] = new List<Vector2>();
+        Edge nouvelleArete = new Edge(sommetA, sommetB);
 
-        adjacencyList[sommetA].Add(sommetB);
-        adjacencyList[sommetB].Add(sommetA);
+        // Ajouter les sommets
+        if (!adjacencySommetsAretes.ContainsKey(sommetA))
+            adjacencySommetsAretes[sommetA] = new HashSet<Edge>();
+        if (!adjacencySommetsAretes.ContainsKey(sommetB))
+            adjacencySommetsAretes[sommetB] = new HashSet<Edge>();
+
+        // Ajouter l'arête aux sommets
+        adjacencySommetsAretes[sommetA].Add(nouvelleArete);
+        adjacencySommetsAretes[sommetB].Add(nouvelleArete);
+
+        // Ajouter le triangle à l'arête
+        if (!adjacencyAretesTriangles.ContainsKey(nouvelleArete))
+            adjacencyAretesTriangles[nouvelleArete] = new HashSet<Triangle>();
+        adjacencyAretesTriangles[nouvelleArete].Add(triangle);
     }
 
-    public void SupprimerArete(Vector2 sommetA, Vector2 sommetB)
+    // Méthode pour vérifier si un point est connecté à d'autres points
+    public bool EstConnecte(Vector2 point)
     {
-        if (adjacencyList.ContainsKey(sommetA))
-            adjacencyList[sommetA].Remove(sommetB);
-        if (adjacencyList.ContainsKey(sommetB))
-            adjacencyList[sommetB].Remove(sommetA);
+        return adjacencySommetsAretes.ContainsKey(point) && adjacencySommetsAretes[point].Count > 0;
+    }
+
+    // Méthode pour obtenir les triangles adjacents à un point
+    public HashSet<Triangle> GetTrianglesAdjacents(Vector2 point)
+    {
+        HashSet<Triangle> trianglesAdjacents = new HashSet<Triangle>();
+        if (adjacencySommetsAretes.ContainsKey(point))
+        {
+            foreach (var arete in adjacencySommetsAretes[point])
+            {
+                if (adjacencyAretesTriangles.ContainsKey(arete))
+                {
+                    trianglesAdjacents.UnionWith(adjacencyAretesTriangles[arete]);
+                }
+            }
+        }
+        return trianglesAdjacents;
     }
 }
 
