@@ -78,7 +78,7 @@ public class PointManager : MonoBehaviour
             }
         }
 
-        if (Input.GetKeyDown(KeyCode.O)) // Appuyer sur O pour activer/désactiver l'affichage des couleurs
+        /*if (Input.GetKeyDown(KeyCode.O)) // Appuyer sur O pour activer/désactiver l'affichage des couleurs
         {
             afficherCouleursOrientation = !afficherCouleursOrientation;
             UnityEngine.Debug.Log("Affichage des couleurs d'orientation : " + (afficherCouleursOrientation ? "Activé" : "Désactivé"));
@@ -91,7 +91,23 @@ public class PointManager : MonoBehaviour
             {
                 ReinitialiserCouleurTriangles(); // Réinitialiser les couleurs normales
             }
+        }*/
+
+        /*if (Input.GetKeyDown(KeyCode.O)) // Appuyer sur O pour activer/désactiver
+        {
+            afficherCouleursOrientation = !afficherCouleursOrientation;
+            MettreAJourAffichageOrientation();
+            UnityEngine.Debug.Log("Mode d'affichage des orientations : " + (afficherCouleursOrientation ? "Activé" : "Désactivé"));
+        }*/
+
+        if (Input.GetKeyDown(KeyCode.O))
+        {
+            afficherCouleursOrientation = !afficherCouleursOrientation;
+            MettreAJourAffichageOrientation();
+            UnityEngine.Debug.Log("Mode d'affichage des orientations : " + (afficherCouleursOrientation ? "Activé" : "Désactivé"));
         }
+
+
 
 
         MettreAJourCouleurPoints();
@@ -743,6 +759,51 @@ public class PointManager : MonoBehaviour
         triangleObject.tag = "Triangle";
         LineRenderer lineRenderer = triangleObject.AddComponent<LineRenderer>();
 
+        // Création des lignes du triangle
+        lineRenderer.positionCount = 4;
+        lineRenderer.startWidth = 0.02f;
+        lineRenderer.endWidth = 0.02f;
+        lineRenderer.material = new Material(Shader.Find("Sprites/Default"));
+        lineRenderer.startColor = lineColor;
+        lineRenderer.endColor = lineColor;
+
+        lineRenderer.SetPosition(0, new Vector3(triangle.A.x, triangle.A.y, 0));
+        lineRenderer.SetPosition(1, new Vector3(triangle.B.x, triangle.B.y, 0));
+        lineRenderer.SetPosition(2, new Vector3(triangle.C.x, triangle.C.y, 0));
+        lineRenderer.SetPosition(3, new Vector3(triangle.A.x, triangle.A.y, 0));
+
+        // ✅ Toujours créer le MeshRenderer mais l'activer/désactiver après
+        MeshFilter meshFilter = triangleObject.AddComponent<MeshFilter>();
+        MeshRenderer meshRenderer = triangleObject.AddComponent<MeshRenderer>();
+
+        Mesh mesh = new Mesh();
+        mesh.vertices = new Vector3[]
+        {
+        new Vector3(triangle.A.x, triangle.A.y, 0),
+        new Vector3(triangle.B.x, triangle.B.y, 0),
+        new Vector3(triangle.C.x, triangle.C.y, 0)
+        };
+
+        mesh.triangles = new int[] { 0, 1, 2 };
+        mesh.RecalculateNormals();
+
+        meshFilter.mesh = mesh;
+
+        // Matériau temporaire
+        meshRenderer.material = new Material(Shader.Find("Standard"));
+        meshRenderer.material.color = lineColor;
+
+        // 🛑 Désactiver le MeshRenderer si afficherCouleursOrientation est désactivé
+        meshRenderer.enabled = afficherCouleursOrientation;
+    }
+
+
+    /*void CreateTriangleVisualization(Triangle triangle, Color lineColor)
+    {
+        GameObject triangleObject = new GameObject("Triangle");
+        triangleObject.tag = "Triangle";
+        LineRenderer lineRenderer = triangleObject.AddComponent<LineRenderer>();
+
         MeshFilter meshFilter = triangleObject.AddComponent<MeshFilter>();
         MeshRenderer meshRenderer = triangleObject.AddComponent<MeshRenderer>();
 
@@ -774,7 +835,9 @@ public class PointManager : MonoBehaviour
         lineRenderer.SetPosition(1, new Vector3(triangle.B.x, triangle.B.y, 0));
         lineRenderer.SetPosition(2, new Vector3(triangle.C.x, triangle.C.y, 0));
         lineRenderer.SetPosition(3, new Vector3(triangle.A.x, triangle.A.y, 0));
-    }
+
+
+    }*/
 
     /*public void AddPointDelaunay(Vector2 newPoint)
     {
@@ -1349,7 +1412,7 @@ public class PointManager : MonoBehaviour
     }
 
 
-    GameObject FindTriangleObject(Triangle triangle)
+    /*GameObject FindTriangleObject(Triangle triangle)
     {
         GameObject[] triangleObjects = GameObject.FindGameObjectsWithTag("Triangle");
 
@@ -1374,7 +1437,54 @@ public class PointManager : MonoBehaviour
         }
 
         return null;
+    }*/
+
+    GameObject FindTriangleObject(Triangle triangle)
+    {
+        GameObject[] triangleObjects = GameObject.FindGameObjectsWithTag("Triangle");
+
+        foreach (GameObject obj in triangleObjects)
+        {
+            LineRenderer lineRenderer = obj.GetComponent<LineRenderer>();
+
+            if (lineRenderer != null && lineRenderer.positionCount >= 3)
+            {
+                Vector3 v0 = lineRenderer.GetPosition(0);
+                Vector3 v1 = lineRenderer.GetPosition(1);
+                Vector3 v2 = lineRenderer.GetPosition(2);
+
+                // Debug : Afficher les coordonnées trouvées
+                UnityEngine.Debug.Log($"Checking TriangleObj: {v0}, {v1}, {v2}");
+
+                if (Vector2.Distance((Vector2)v0, triangle.A) < 0.01f &&
+                    Vector2.Distance((Vector2)v1, triangle.B) < 0.01f &&
+                    Vector2.Distance((Vector2)v2, triangle.C) < 0.01f)
+                {
+                    return obj;
+                }
+            }
+        }
+
+        return null;
     }
+
+    void MettreAJourAffichageOrientation()
+    {
+        GameObject[] triangleObjects = GameObject.FindGameObjectsWithTag("Triangle");
+
+        foreach (GameObject obj in triangleObjects)
+        {
+            MeshRenderer meshRenderer = obj.GetComponent<MeshRenderer>();
+
+            if (meshRenderer != null)
+            {
+                meshRenderer.enabled = afficherCouleursOrientation;
+            }
+        }
+    }
+
+
+
 
 
 }

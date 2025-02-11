@@ -25,6 +25,9 @@ public class PointManager3D : MonoBehaviour
     private GrapheIncidence graphe = new GrapheIncidence();
     private Vector3? dragStartPosition;
 
+    private bool afficherCouleursOrientation = false;
+
+
     void Start()
     {
         mainCamera = Camera.main;
@@ -127,11 +130,13 @@ public class PointManager3D : MonoBehaviour
             DebugGrapheIncidence3D();
         }
 
-        if (Input.GetKeyDown(KeyCode.O)) // Touche O pour la 3D
+        if (Input.GetKeyDown(KeyCode.O))
         {
-            UnityEngine.Debug.Log("Correction de l'orientation trigonométrique des tétraèdres...");
-            CorrigerOrientationTriangles3D();
+            afficherCouleursOrientation = !afficherCouleursOrientation;
+            MettreAJourAffichageOrientation3D();
+            UnityEngine.Debug.Log("Affichage des tétraèdres en 3D : " + (afficherCouleursOrientation ? "Activé" : "Désactivé"));
         }
+
 
 
     }
@@ -633,6 +638,11 @@ public class PointManager3D : MonoBehaviour
             lines.Add(tetra.D);
         }
 
+        foreach (var tetra in tetras)
+        {
+            CreateTetrahedronVisualization(tetra, color);
+        }
+
         if (lineRenderer != null)
         {
             lineRenderer.startColor = color;
@@ -689,6 +699,52 @@ public class PointManager3D : MonoBehaviour
         }
         UnityEngine.Debug.Log($"Nombre total de faces : {toutesLesFaces.Count}");
     }
+
+    void CreateTetrahedronVisualization(Tetrahedron tetra, Color color)
+    {
+        GameObject tetraObj = new GameObject("Tetrahedron");
+        tetraObj.tag = "Tetrahedron";
+
+        MeshFilter meshFilter = tetraObj.AddComponent<MeshFilter>();
+        MeshRenderer meshRenderer = tetraObj.AddComponent<MeshRenderer>();
+
+        Mesh mesh = new Mesh();
+        Vector3[] vertices = { tetra.A, tetra.B, tetra.C, tetra.D };
+        int[] triangles = {
+        0, 1, 2,  // Face ABC
+        0, 1, 3,  // Face ABD
+        0, 2, 3,  // Face ACD
+        1, 2, 3   // Face BCD
+    };
+
+        mesh.vertices = vertices;
+        mesh.triangles = triangles;
+        mesh.RecalculateNormals();
+
+        meshFilter.mesh = mesh;
+
+        // Appliquer un matériau coloré
+        meshRenderer.material = new Material(Shader.Find("Standard"));
+        meshRenderer.material.color = color;
+    }
+
+
+    void MettreAJourAffichageOrientation3D()
+    {
+        GameObject[] tetrahedrons = GameObject.FindGameObjectsWithTag("Tetrahedron");
+
+        foreach (GameObject obj in tetrahedrons)
+        {
+            MeshRenderer meshRenderer = obj.GetComponent<MeshRenderer>();
+            if (meshRenderer != null)
+            {
+                meshRenderer.enabled = afficherCouleursOrientation;
+            }
+        }
+    }
+
+
+
 }
 
 // Classes de support
