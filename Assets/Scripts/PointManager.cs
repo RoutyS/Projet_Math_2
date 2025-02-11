@@ -152,6 +152,44 @@ public class PointManager : MonoBehaviour
         }
     }
 
+    void ClearCyanBorderTriangles()
+    {
+        HashSet<Edge> borderEdges = new HashSet<Edge>();
+        Dictionary<Edge, int> edgeCount = new Dictionary<Edge, int>();
+
+        // 1️⃣ Compter les occurrences de chaque arête
+        foreach (var triangle in triangles)
+        {
+            foreach (var edge in triangle.GetEdges())
+            {
+                if (!edgeCount.ContainsKey(edge))
+                    edgeCount[edge] = 1;
+                else
+                    edgeCount[edge]++;
+            }
+        }
+
+        // 2️⃣ Garder seulement les arêtes qui n'ont qu'une seule occurrence (bordure)
+        foreach (var edge in edgeCount)
+        {
+            if (edge.Value == 1) // Arête unique = triangle en bordure
+                borderEdges.Add(edge.Key);
+        }
+
+        // 3️⃣ Trouver les triangles qui possèdent ces arêtes
+        List<Triangle> borderTriangles = triangles
+            .Where(t => t.GetEdges().Any(e => borderEdges.Contains(e)))
+            .ToList();
+
+        // 4️⃣ Supprimer uniquement ces triangles
+        foreach (var triangle in borderTriangles)
+        {
+            triangles.Remove(triangle);
+        }
+    }
+
+
+
     private void ClearAll()
     {
         // Effacer les visualisations
@@ -186,6 +224,7 @@ public class PointManager : MonoBehaviour
     {
         if (points.Count < 3) return;
 
+     
         List<Vector2> hull = new List<Vector2>();
         Vector2 leftmost = points.OrderBy(p => p.x).First();
         Vector2 current = leftmost;
@@ -210,8 +249,9 @@ public class PointManager : MonoBehaviour
     // Enveloppe convexe avec Graham Scan
     public void GrahamScan()
     {
+        
         if (points.Count < 3) return;
-
+       
         Vector2 pivot = points.OrderBy(p => p.y).ThenBy(p => p.x).First();
         var sortedPoints = points.OrderBy(p => Mathf.Atan2(p.y - pivot.y, p.x - pivot.x)).ToList();
 
@@ -267,12 +307,16 @@ public class PointManager : MonoBehaviour
         lineRenderer.startColor = lineColor;
         lineRenderer.endColor = lineColor;
 
+    
+        lineRenderer.sortingOrder = 2;
+
         for (int i = 0; i < hull.Count; i++)
         {
             lineRenderer.SetPosition(i, new Vector3(hull[i].x, hull[i].y, 0));
         }
         lineRenderer.SetPosition(hull.Count, new Vector3(hull[0].x, hull[0].y, 0));
     }
+
 
     // Triangulation incrémentale
     /*void TriangulationIncrementale()
