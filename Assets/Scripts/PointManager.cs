@@ -306,37 +306,44 @@ public class PointManager : MonoBehaviour
         }
     }*/
 
-    void TriangulationIncrementale()
-    {
-        if (points.Count < 3)
+   
+        void TriangulationIncrementale()
         {
-            UnityEngine.Debug.Log("Pas assez de points pour la triangulation incrémentale.");
-            return;
-        }
-
-        try
-        {
-            ClearVisualization();
-            triangles.Clear();
-            graphe = new GrapheIncidence2D(); // Réinitialiser le graphe d'incidence
-
-            // Créer le triangle initial dans le sens trigonométrique
-            Vector2 a = points[0];
-            Vector2 b = points[1];
-            Vector2 c = points[2];
-
-            // Garantir l'orientation trigonométrique
-            if (!IsCounterClockwise(a, b, c))
+            if (points.Count < 3)
             {
-                // Inverser l'ordre si besoin
-                var temp = b;
-                b = c;
-                c = temp;
+                UnityEngine.Debug.Log("Pas assez de points pour la triangulation incrémentale.");
+                return;
             }
 
-            Triangle initialTriangle = new Triangle(a, b, c);
-            triangles.Add(initialTriangle);
+            try
+            {
+                // Supprimer d'abord les triangles cyan existants
+                GameObject[] triangleObjects = GameObject.FindGameObjectsWithTag("Triangle");
+                foreach (GameObject obj in triangleObjects)
+                {
+                    LineRenderer lineRenderer = obj.GetComponent<LineRenderer>();
+                    if (lineRenderer != null && lineRenderer.startColor == colorIncremental)
+                    {
+                        Destroy(obj);
+                    }
+                }
 
+                ClearVisualization();
+                triangles.Clear();
+                graphe = new GrapheIncidence2D();
+                Vector2 a = points[0];
+                Vector2 b = points[1];
+                Vector2 c = points[2];
+
+                if (!IsCounterClockwise(a, b, c))
+                {
+                    var temp = b;
+                    b = c;
+                    c = temp;
+                }
+
+                Triangle initialTriangle = new Triangle(a, b, c);
+                triangles.Add(initialTriangle);
             // Ajouter l'arête initiale au graphe d'incidence
             graphe.AjouterArete(a, b, initialTriangle);
             graphe.AjouterArete(b, c, initialTriangle);
@@ -351,12 +358,13 @@ public class PointManager : MonoBehaviour
             DrawTriangles(colorIncremental);
             UnityEngine.Debug.Log($"Triangulation incrémentale terminée avec {triangles.Count} triangles.");
         }
-        catch (Exception e)
-        {
-            UnityEngine.Debug.LogError($"Erreur lors de la triangulation incrémentale : {e.Message}");
-        }
+            catch (Exception e)
+            {
+                UnityEngine.Debug.LogError($"Erreur lors de la triangulation incrémentale : {e.Message}");
+            }
 
-        CorrigerOrientationTriangles();
+            CorrigerOrientationTriangles();
+
     }
 
     /*void AddPointToTriangulation(Vector2 newPoint)
@@ -384,56 +392,78 @@ public class PointManager : MonoBehaviour
     }*/
 
     void AddPointToTriangulation(Vector2 newPoint)
+{
+   
+    List<Triangle> badTriangles = new List<Triangle>();
+    List<Edge> boundaryEdges = new List<Edge>();
+    
+
+    foreach (var triangle in triangles.ToList())
     {
-        List<Triangle> badTriangles = new List<Triangle>();
-        List<Edge> polygonEdges = new List<Edge>();
-
-        // Optimisation : Rechercher d'abord les triangles contenant le point
-        foreach (var triangle in triangles)
+        if (triangle.IsPointInCircumcircle(newPoint))
         {
-            if (triangle.IsPointInCircumcircle(newPoint))
-            {
-                badTriangles.Add(triangle);
-            }
-        }
-
-        // Identifier les bords du polygone de trou
-        HashSet<Edge> boundaryEdges = new HashSet<Edge>();
-        foreach (var badTriangle in badTriangles)
-        {
-            foreach (var edge in badTriangle.GetEdges())
-            {
-                // Ne conserver que les arêtes qui n'apparaissent qu'une seule fois
-                bool isShared = badTriangles.Count(t => t.HasEdge(edge)) > 1;
-                if (!isShared)
-                {
-                    boundaryEdges.Add(edge);
-                }
-            }
-        }
-
-        // Supprimer les triangles problématiques
-        foreach (var badTriangle in badTriangles)
-        {
-            triangles.Remove(badTriangle);
-        }
-
-        // Créer de nouveaux triangles
-        foreach (var edge in boundaryEdges)
-        {
-            // Créer un triangle en s'assurant de l'orientation trigonométrique
-            Triangle newTriangle = IsCounterClockwise(edge.A, edge.B, newPoint)
-                ? new Triangle(edge.A, edge.B, newPoint)
-                : new Triangle(edge.B, edge.A, newPoint);
-
-            triangles.Add(newTriangle);
-
-            // Mettre à jour le graphe d'incidence
-            graphe.AjouterArete(edge.A, edge.B, newTriangle);
-            graphe.AjouterArete(edge.B, newPoint, newTriangle);
-            graphe.AjouterArete(newPoint, edge.A, newTriangle);
+            badTriangles.Add(triangle);
         }
     }
+
+    
+    if (badTriangles.Count == 0)
+    {
+       
+        var sortedPoints = points
+            .Where(p => p != newPoint)
+            .OrderBy(p => Vector2.Distance(p, newPoint))
+            .Take(2)
+            .ToList();
+
+        if (sortedPoints.Count >= 2)
+        {
+            Vector2 p1 = sortedPoints[0];
+            Vector2 p2 = sortedPoints[1];
+            
+          
+            if (IsCounterClockwise(p1, p2, newPoint))
+                triangles.Add(new Triangle(p1, p2, newPoint));
+            else
+                triangles.Add(new Triangle(p2, p1, newPoint));
+        }
+        return;
+    }
+
+ 
+    HashSet<Edge> edges = new HashSet<Edge>();
+    foreach (var triangle in badTriangles)
+    {
+        foreach (var edge in triangle.GetEdges())
+        {
+            if (!edges.Add(edge))
+                edges.Remove(edge);
+        }
+    }
+    boundaryEdges = edges.ToList();
+
+   
+    foreach (var triangle in badTriangles)
+    {
+        triangles.Remove(triangle);
+    }
+
+    foreach (var edge in boundaryEdges)
+    {
+        Triangle newTriangle;
+        if (IsCounterClockwise(edge.A, edge.B, newPoint))
+            newTriangle = new Triangle(edge.A, edge.B, newPoint);
+        else
+            newTriangle = new Triangle(edge.B, edge.A, newPoint);
+            
+        triangles.Add(newTriangle);
+        
+       
+        graphe.AjouterArete(edge.A, edge.B, newTriangle);
+        graphe.AjouterArete(edge.B, newPoint, newTriangle);
+        graphe.AjouterArete(newPoint, edge.A, newTriangle);
+    }
+}
 
     List<Edge> GetPolygonEdges(List<Triangle> badTriangles)
     {
@@ -759,9 +789,10 @@ public class PointManager : MonoBehaviour
     {
         GameObject triangleObject = new GameObject("Triangle");
         triangleObject.tag = "Triangle";
-        LineRenderer lineRenderer = triangleObject.AddComponent<LineRenderer>();
+        triangleObject.transform.parent = transform; // ✅ Ajouter un parent pour une meilleure organisation
 
-        // Création des lignes du triangle
+        // Configuration du LineRenderer
+        LineRenderer lineRenderer = triangleObject.AddComponent<LineRenderer>();
         lineRenderer.positionCount = 4;
         lineRenderer.startWidth = 0.02f;
         lineRenderer.endWidth = 0.02f;
@@ -769,36 +800,37 @@ public class PointManager : MonoBehaviour
         lineRenderer.startColor = lineColor;
         lineRenderer.endColor = lineColor;
 
-        lineRenderer.SetPosition(0, new Vector3(triangle.A.x, triangle.A.y, 0));
-        lineRenderer.SetPosition(1, new Vector3(triangle.B.x, triangle.B.y, 0));
-        lineRenderer.SetPosition(2, new Vector3(triangle.C.x, triangle.C.y, 0));
-        lineRenderer.SetPosition(3, new Vector3(triangle.A.x, triangle.A.y, 0));
+        Vector3[] positions = new Vector3[]
+        {
+            new Vector3(triangle.A.x, triangle.A.y, 0),
+            new Vector3(triangle.B.x, triangle.B.y, 0),
+            new Vector3(triangle.C.x, triangle.C.y, 0),
+            new Vector3(triangle.A.x, triangle.A.y, 0)
+        };
+        lineRenderer.SetPositions(positions); // ✅ Plus efficace que des SetPosition individuels
 
-        // ✅ Toujours créer le MeshRenderer mais l'activer/désactiver après
+        // Configuration du Mesh
         MeshFilter meshFilter = triangleObject.AddComponent<MeshFilter>();
         MeshRenderer meshRenderer = triangleObject.AddComponent<MeshRenderer>();
-
+    
         Mesh mesh = new Mesh();
-        mesh.vertices = new Vector3[]
+        Vector3[] vertices = new Vector3[]
         {
-        new Vector3(triangle.A.x, triangle.A.y, 0),
-        new Vector3(triangle.B.x, triangle.B.y, 0),
-        new Vector3(triangle.C.x, triangle.C.y, 0)
+            new Vector3(triangle.A.x, triangle.A.y, 0),
+            new Vector3(triangle.B.x, triangle.B.y, 0),
+            new Vector3(triangle.C.x, triangle.C.y, 0)
         };
-
+        mesh.vertices = vertices;
         mesh.triangles = new int[] { 0, 1, 2 };
         mesh.RecalculateNormals();
-
         meshFilter.mesh = mesh;
 
-        // Matériau temporaire
-        meshRenderer.material = new Material(Shader.Find("Standard"));
-        meshRenderer.material.color = lineColor;
-
-        // 🛑 Désactiver le MeshRenderer si afficherCouleursOrientation est désactivé
+        // Configuration du matériau
+        Material material = new Material(Shader.Find("Standard"));
+        material.color = lineColor;
+        meshRenderer.material = material;
         meshRenderer.enabled = afficherCouleursOrientation;
     }
-
 
     /*void CreateTriangleVisualization(Triangle triangle, Color lineColor)
     {
