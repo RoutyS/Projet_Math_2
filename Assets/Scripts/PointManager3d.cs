@@ -456,31 +456,171 @@ public class PointManager3D : MonoBehaviour
         tetrahedra.Clear();
         tetrahedra.Add(new Tetrahedron(points3D[0], points3D[1], points3D[2], points3D[3]));
 
-        for (int i = 4; i < points3D.Count; i++)
+        try
         {
-            Vector3 point = points3D[i];
-            List<Tetrahedron> badTetrahedra = new List<Tetrahedron>();
-
-            foreach (var tetra in tetrahedra.ToList())
+            // Supprimer d'abord les tétraèdres existants
+            GameObject[] tetraObjects = GameObject.FindGameObjectsWithTag("Tetrahedron");
+            foreach (GameObject obj in tetraObjects)
             {
-                if (tetra.IsPointInCircumsphere(point))
+                LineRenderer lineRenderer = obj.GetComponent<LineRenderer>();
+                if (lineRenderer != null && lineRenderer.startColor == colorIncremental)
                 {
-                    badTetrahedra.Add(tetra);
+                    Destroy(obj);
                 }
             }
 
-            foreach (var tetra in badTetrahedra)
+            ClearVisualization();
+            tetrahedra.Clear();
+            graphe = new GrapheIncidence();
+
+            // Créer le tétraèdre initial avec une orientation correcte
+            Vector3 a = points3D[0];
+            Vector3 b = points3D[1];
+            Vector3 c = points3D[2];
+            Vector3 d = points3D[3];
+
+            // Vérifier et corriger l'orientation du tétraèdre initial
+            if (CalculateSignedVolume(a, b, c, d) < 0)
             {
-                tetrahedra.Remove(tetra);
+                var temp = c;
+                c = b;
+                b = temp;
             }
 
-            foreach (var face in GetBoundaryFaces(badTetrahedra))
+            Tetrahedron initialTetra = new Tetrahedron(a, b, c, d);
+            tetrahedra.Add(initialTetra);
+
+            // Ajouter les arêtes initiales au graphe d'incidence
+            foreach (var edge in initialTetra.Aretes)
             {
-                tetrahedra.Add(new Tetrahedron(face.A, face.B, face.C, point));
+                graphe.AjouterArete(edge.Start, edge);
+                graphe.AjouterArete(edge.End, edge);
+            }
+
+            // Ajouter les faces au graphe
+            foreach (var face in initialTetra.GetFaces())
+            {
+                foreach (var edge in initialTetra.Aretes)
+                {
+                    graphe.AjouterFace(edge, face);
+                }
+            }
+
+            // Ajouter les points suivants un par un
+            for (int i = 4; i < points3D.Count; i++)
+            {
+                AddPointToTetrahedralization(points3D[i]);
+            }
+
+            DrawTetrahedra(tetrahedra, colorIncremental);
+            UnityEngine.Debug.Log($"Triangulation incrémentale 3D terminée avec {tetrahedra.Count} tétraèdres.");
+
+            CorrigerOrientationTetraedres();
+        }
+        catch (Exception e)
+        {
+            UnityEngine.Debug.LogError($"Erreur lors de la triangulation incrémentale 3D : {e.Message}");
+        }
+    }
+
+    private float CalculateSignedVolume(Vector3 a, Vector3 b, Vector3 c, Vector3 d)
+    {
+        Matrix4x4 m = new Matrix4x4();
+        m.SetRow(0, new Vector4(a.x, a.y, a.z, 1));
+        m.SetRow(1, new Vector4(b.x, b.y, b.z, 1));
+        m.SetRow(2, new Vector4(c.x, c.y, c.z, 1));
+        m.SetRow(3, new Vector4(d.x, d.y, d.z, 1));
+        return m.determinant / 6.0f;
+    }
+
+    void AddPointToTetrahedralization(Vector3 newPoint)
+    {
+        List<Tetrahedron> badTetrahedra = new List<Tetrahedron>();
+        List<Face3D> boundaryFaces = new List<Face3D>();
+
+        // Trouver tous les tétraèdres dont la sphère circonscrite contient le nouveau point
+        foreach (var tetra in tetrahedra.ToList())
+        {
+            if (tetra.IsPointInCircumsphere(newPoint))
+            {
+                badTetrahedra.Add(tetra);
             }
         }
 
-        DrawTetrahedra(tetrahedra, colorIncremental);
+        // Si aucun "mauvais" tétraèdre n'est trouvé, créer un nouveau avec les points les plus proches
+        if (badTetrahedra.Count == 0)
+        {
+            var sortedPoints = points3D
+                .Where(p => p != newPoint)
+                .OrderBy(p => Vector3.Distance(p, newPoint))
+                .Take(3)
+                .ToList();
+
+            if (sortedPoints.Count >= 3)
+            {
+                Vector3 p1 = sortedPoints[0];
+                Vector3 p2 = sortedPoints[1];
+                Vector3 p3 = sortedPoints[2];
+
+                if (CalculateSignedVolume(p1, p2, p3, newPoint) > 0)
+                {
+                    tetrahedra.Add(new Tetrahedron(p1, p2, p3, newPoint));
+                }
+                else
+                {
+                    tetrahedra.Add(new Tetrahedron(p1, p3, p2, newPoint));
+                }
+            }
+            return;
+        }
+
+        // Obtenir les faces frontières
+        HashSet<Face3D> faces = new HashSet<Face3D>();
+        foreach (var tetra in badTetrahedra)
+        {
+            foreach (var face in tetra.GetFaces())
+            {
+                if (!faces.Add(face))
+                    faces.Remove(face);
+            }
+        }
+        boundaryFaces = faces.ToList();
+
+        // Supprimer les mauvais tétraèdres
+        foreach (var tetra in badTetrahedra)
+        {
+            tetrahedra.Remove(tetra);
+        }
+
+        // Créer de nouveaux tétraèdres
+        foreach (var face in boundaryFaces)
+        {
+            Tetrahedron newTetra;
+            if (CalculateSignedVolume(face.A, face.B, face.C, newPoint) > 0)
+            {
+                newTetra = new Tetrahedron(face.A, face.B, face.C, newPoint);
+            }
+            else
+            {
+                newTetra = new Tetrahedron(face.A, face.C, face.B, newPoint);
+            }
+
+            tetrahedra.Add(newTetra);
+
+            // Mettre à jour le graphe d'incidence
+            foreach (var edge in newTetra.Aretes)
+            {
+                graphe.AjouterArete(edge.Start, edge);
+                graphe.AjouterArete(edge.End, edge);
+            }
+            foreach (var tetraFace in newTetra.GetFaces())
+            {
+                foreach (var edge in newTetra.Aretes)
+                {
+                    graphe.AjouterFace(edge, tetraFace);
+                }
+            }
+        }
     }
 
     // Triangulation de Delaunay en 3D
@@ -618,7 +758,7 @@ public class PointManager3D : MonoBehaviour
     // Méthodes de dessin
     private void DrawTetrahedra(List<Tetrahedron> tetras, Color color)
     {
-        CorrigerOrientationTetrahedres();
+        CorrigerOrientationTetraedres();
 
         List<Vector3> lines = new List<Vector3>();
         foreach (var tetra in tetras)
@@ -745,24 +885,25 @@ public class PointManager3D : MonoBehaviour
         }
     }
 
-    void CorrigerOrientationTetrahedres()
+    void CorrigerOrientationTetraedres()
     {
+        int count = 0;
         for (int i = 0; i < tetrahedra.Count; i++)
         {
-            Tetrahedron t = tetrahedra[i];
+            Tetrahedron tetra = tetrahedra[i];
+            float volume = CalculateSignedVolume(tetra.A, tetra.B, tetra.C, tetra.D);
 
-            // Vérification de l'orientation du tétraèdre
-            float orientation = Orientation3D(t.A, t.B, t.C, t.D);
-
-            if (orientation < 0) // Si la base est mal orientée, on inverse un sommet
+            if (volume < 0)
             {
-                (t.B, t.C) = (t.C, t.B); // On échange B et C
+                // Échanger deux sommets pour inverser l'orientation
+                (tetra.B, tetra.C) = (tetra.C, tetra.B);
+                count++;
             }
         }
-        UnityEngine.Debug.Log("Orientation des tétraèdres corrigée !");
+        UnityEngine.Debug.Log($"Orientation corrigée pour {count} tétraèdres.");
     }
 
-
+     
 
 
 }
