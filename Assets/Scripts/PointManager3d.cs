@@ -618,6 +618,8 @@ public class PointManager3D : MonoBehaviour
     // Méthodes de dessin
     private void DrawTetrahedra(List<Tetrahedron> tetras, Color color)
     {
+        CorrigerOrientationTetrahedres();
+
         List<Vector3> lines = new List<Vector3>();
         foreach (var tetra in tetras)
         {
@@ -742,6 +744,24 @@ public class PointManager3D : MonoBehaviour
             }
         }
     }
+
+    void CorrigerOrientationTetrahedres()
+    {
+        for (int i = 0; i < tetrahedra.Count; i++)
+        {
+            Tetrahedron t = tetrahedra[i];
+
+            // Vérification de l'orientation du tétraèdre
+            float orientation = Orientation3D(t.A, t.B, t.C, t.D);
+
+            if (orientation < 0) // Si la base est mal orientée, on inverse un sommet
+            {
+                (t.B, t.C) = (t.C, t.B); // On échange B et C
+            }
+        }
+        UnityEngine.Debug.Log("Orientation des tétraèdres corrigée !");
+    }
+
 
 
 

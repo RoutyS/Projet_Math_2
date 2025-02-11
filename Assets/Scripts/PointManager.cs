@@ -355,6 +355,8 @@ public class PointManager : MonoBehaviour
         {
             UnityEngine.Debug.LogError($"Erreur lors de la triangulation incrémentale : {e.Message}");
         }
+
+        CorrigerOrientationTriangles();
     }
 
     /*void AddPointToTriangulation(Vector2 newPoint)
@@ -1332,19 +1334,21 @@ public class PointManager : MonoBehaviour
 
     void CorrigerOrientationTriangles()
     {
+        int count = 0;
         for (int i = 0; i < triangles.Count; i++)
         {
             Triangle triangle = triangles[i];
 
             if (!IsCounterClockwise(triangle.A, triangle.B, triangle.C))
             {
-                // Inversion pour respecter le sens trigonométrique
                 (triangle.B, triangle.C) = (triangle.C, triangle.B);
+                count++;
             }
         }
-
-        UnityEngine.Debug.Log("Orientation des triangles corrigée en 2D !");
+        UnityEngine.Debug.Log($"Orientation corrigée pour {count} triangles !");
     }
+
+
 
     void MettreAJourCouleurPoints()
     {
@@ -1369,7 +1373,7 @@ public class PointManager : MonoBehaviour
 
     void ColorerTriangles()
     {
-        if (!afficherCouleursOrientation) return; // Ne rien faire si l'affichage est désactivé
+        if (!afficherCouleursOrientation) return;
 
         foreach (var triangle in triangles)
         {
@@ -1382,13 +1386,14 @@ public class PointManager : MonoBehaviour
 
                 if (lineRenderer != null)
                 {
-                    // Vert si le triangle est correctement orienté, Rouge sinon
+                    // Vert si l'orientation est correcte, Rouge sinon
                     lineRenderer.startColor = isCorrect ? Color.green : Color.red;
                     lineRenderer.endColor = isCorrect ? Color.green : Color.red;
                 }
             }
         }
     }
+
 
 
     void ReinitialiserCouleurTriangles()
